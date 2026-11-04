@@ -1,0 +1,27 @@
+[Unit]
+Description=Compose Manager
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+# 创建专用账户并授予受管项目和 Docker 所需权限；不要直接复制未知账户配置。
+User=compose-manager
+Group=compose-manager
+SupplementaryGroups=docker
+WorkingDirectory=/opt/compose-manager
+ExecStart=/opt/compose-manager/compose-manager --config /opt/compose-manager/config.yaml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+Environment=GIT_TERMINAL_PROMPT=0
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target

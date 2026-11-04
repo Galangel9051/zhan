@@ -1,0 +1,19 @@
+# 相对路径以服务的工作目录为基准。
+listen: 127.0.0.1:18080
+# 正式部署请使用 /opt/compose-manager/data 或其他专用目录。
+data_dir: data
+# 默认不限目录，使用服务器账户的文件系统权限；可在导入窗口自由浏览选择。
+allowed_roots: []
+# 如需限定范围，可改为：
+# allowed_roots:
+#   - /opt/projects
+# 通过 HTTPS 访问时设为 true。反向代理需保持 Host。
+secure_cookies: false
+session_hours: 12
+# 默认所有任务全局串行；同一 Stack 和同一 Git 工作区始终互斥。
+workers: 1
+task_timeout_minutes: 30
+log_retention_days: 30
+max_log_mb: 20
+# 初次失败后，最多再自动尝试两次。新 Commit 不受旧 Commit 的暂停影响。
+retry_delays_seconds: [300, 900]

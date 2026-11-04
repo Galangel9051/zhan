@@ -1,0 +1,224 @@
+package notify
+
+import (
+	"bufio"
+	"compose-manager/backend/internal/auth"
+	"compose-manager/backend/internal/database"
+	"compose-manager/backend/internal/model"
+	"encoding/base64"
+	"fmt"
+	"net"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+func TestFailureNotificationDedupAndIndependentError(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	var delivered atomic.Int32
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer conn.Close()
+				fmt.Fprint(conn, "220 fixture ESMTP\r\n")
+				reader := bufio.NewReader(conn)
+				inData := false
+				for {
+					line, err := reader.ReadString('\n')
+					if err != nil {
+						return
+					}
+					line = strings.TrimSpace(line)
+					if inData {
+						if line == "." {
+							inData = false
+							delivered.Add(1)
+							fmt.Fprint(conn, "250 accepted\r\n")
+						}
+						continue
+					}
+					switch {
+					case strings.HasPrefix(line, "EHLO"), strings.HasPrefix(line, "HELO"):
+						fmt.Fprint(conn, "250 fixture\r\n")
+					case strings.HasPrefix(line, "MAIL"), strings.HasPrefix(line, "RCPT"):
+						fmt.Fprint(conn, "250 ok\r\n")
+					case line == "DATA":
+						inData = true
+						fmt.Fprint(conn, "354 send data\r\n")
+					case line == "QUIT":
+						fmt.Fprint(conn, "221 bye\r\n")
+						return
+					default:
+						fmt.Fprint(conn, "250 ok\r\n")
+					}
+				}
+			}()
+		}
+	}()
+	dir := t.TempDir()
+	db, err := database.Open(filepath.Join(dir, "manager.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	a, err := auth.New(db, dir, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := &Notifier{DB: db, Auth: a}
+	_, port, _ := net.SplitHostPort(listener.Addr().String())
+	p, _ := strconv.Atoi(port)
+	cfg := model.SMTP{Host: "127.0.0.1", Port: p, TLS: "none", From: "sender@example.invalid", Recipients: []string{"recipient@example.invalid"}, Stages: []string{"build"}, Cooldown: 30}
+	if err = n.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	s := model.Stack{Name: "fixture", ProjectName: "fixture", Directory: "/fixture", Files: []string{"compose.yaml"}, Desired: "running", Interval: 300, Notify: true}
+	if err = db.SaveStack(&s, true); err != nil {
+		t.Fatal(err)
+	}
+	task := model.Task{StackID: s.ID, Type: "rebuild", Trigger: "manual"}
+	db.CreateTask(&task)
+	task.Status = "failed"
+	task.Stage = "build"
+	task.Commit = "commit-a"
+	task.Error = "fixture failure"
+	task.ExitCode = 42
+	db.Finish(task)
+	n.Failure(task, s)
+	n.Failure(task, s)
+	if delivered.Load() != 1 {
+		t.Fatalf("mail not deduplicated: %d", delivered.Load())
+	}
+	listener.Close()
+	task.Commit = "commit-b"
+	n.Failure(task, s)
+	var notifications int
+	db.QueryRow("SELECT count(*) FROM notification_logs WHERE status='failed'").Scan(&notifications)
+	if notifications != 1 {
+		t.Fatal("SMTP error not recorded")
+	}
+	stored, _ := db.Task(task.ID)
+	if stored.Error != "fixture failure" || stored.ExitCode != 42 {
+		t.Fatal("SMTP failure overwrote build failure")
+	}
+}
+
+func TestUnsavedSMTPTestUsesEnteredPasswordWithoutSaving(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	authValues := make(chan string, 2)
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer conn.Close()
+				conn.SetDeadline(time.Now().Add(5 * time.Second))
+				fmt.Fprint(conn, "220 fixture ESMTP\r\n")
+				reader := bufio.NewReader(conn)
+				inData := false
+				for {
+					line, err := reader.ReadString('\n')
+					if err != nil {
+						return
+					}
+					line = strings.TrimSpace(line)
+					if inData {
+						if line == "." {
+							inData = false
+							fmt.Fprint(conn, "250 accepted\r\n")
+						}
+						continue
+					}
+					switch {
+					case strings.HasPrefix(line, "EHLO"):
+						fmt.Fprint(conn, "250-fixture\r\n250 AUTH PLAIN\r\n")
+					case strings.HasPrefix(line, "AUTH PLAIN "):
+						value, _ := base64.StdEncoding.DecodeString(strings.TrimPrefix(line, "AUTH PLAIN "))
+						authValues <- string(value)
+						fmt.Fprint(conn, "235 authenticated\r\n")
+					case strings.HasPrefix(line, "MAIL"), strings.HasPrefix(line, "RCPT"):
+						fmt.Fprint(conn, "250 ok\r\n")
+					case line == "DATA":
+						inData = true
+						fmt.Fprint(conn, "354 send data\r\n")
+					case line == "QUIT":
+						fmt.Fprint(conn, "221 bye\r\n")
+						return
+					default:
+						fmt.Fprint(conn, "250 ok\r\n")
+					}
+				}
+			}()
+		}
+	}()
+	dir := t.TempDir()
+	db, err := database.Open(filepath.Join(dir, "manager.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	a, err := auth.New(db, dir, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := &Notifier{DB: db, Auth: a}
+	_, port, _ := net.SplitHostPort(listener.Addr().String())
+	p, _ := strconv.Atoi(port)
+	entered := model.SMTP{Host: "127.0.0.1", Port: p, TLS: "none", Username: "test-user", Password: "temporary-password", From: "sender@example.invalid", Recipients: []string{"recipient@example.invalid"}, Cooldown: 30}
+	if err = n.TestConfig(entered); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case value := <-authValues:
+		if value != "\x00test-user\x00temporary-password" {
+			t.Fatal("entered password was ignored")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SMTP auth was not attempted")
+	}
+	saved, err := n.Settings()
+	if err != nil || saved.Host != "" || saved.PasswordSet {
+		t.Fatal("test unexpectedly saved submitted settings or password")
+	}
+	var count int
+	db.QueryRow("SELECT count(*) FROM notification_logs WHERE notification_type='test' AND status='success'").Scan(&count)
+	if count != 1 {
+		t.Fatal("test result was not recorded")
+	}
+	if err = n.Save(entered); err != nil {
+		t.Fatal(err)
+	}
+	entered.Password = ""
+	if err = n.TestConfig(entered); err != nil {
+		t.Fatal("saved password could not be reused: ", err)
+	}
+	select {
+	case value := <-authValues:
+		if value != "\x00test-user\x00temporary-password" {
+			t.Fatal("saved password was not used")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("saved auth not attempted")
+	}
+	entered.Username = "changed-user"
+	if err = n.TestConfig(entered); err == nil || !strings.Contains(err.Error(), "重新填写密码") {
+		t.Fatal("stored password was reused for changed connection settings")
+	}
+}

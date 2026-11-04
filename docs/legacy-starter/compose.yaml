@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      GIN_MODE: release
+      HOST: 0.0.0.0
+      PORT: "8080"
+      DB_PATH: /app/data/app.db
+    volumes:
+      - sqlite-data:/app/data
+    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+volumes:
+  sqlite-data:
