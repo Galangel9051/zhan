@@ -9,6 +9,7 @@ import (
 	"compose-manager/backend/internal/docker"
 	"compose-manager/backend/internal/model"
 	"compose-manager/backend/internal/notify"
+	"compose-manager/backend/internal/proxy"
 	"compose-manager/backend/internal/webui"
 	"context"
 	"crypto/subtle"
@@ -34,6 +35,7 @@ type Server struct {
 	Docker     *docker.Client
 	Engine     *deploy.Engine
 	Notify     *notify.Notifier
+	Proxy      *proxy.Manager
 	Config     config.Config
 	limitMu    sync.Mutex
 	attempts   map[string]attempt
@@ -89,6 +91,7 @@ func (s *Server) Router() *gin.Engine {
 	})
 	api.POST("/auth/login", s.login)
 	api.Use(s.session)
+	s.proxyRoutes(api)
 	api.GET("/auth/me", func(c *gin.Context) { c.JSON(200, gin.H{"data": user(c)}) })
 	api.POST("/auth/password", s.changePassword)
 	api.POST("/auth/logout", func(c *gin.Context) {

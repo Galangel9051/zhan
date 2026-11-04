@@ -9,6 +9,7 @@ import (
 	"compose-manager/backend/internal/docker"
 	"compose-manager/backend/internal/httpapi"
 	"compose-manager/backend/internal/notify"
+	"compose-manager/backend/internal/proxy"
 	"context"
 	"errors"
 	"flag"
@@ -89,7 +90,12 @@ func run() error {
 	if err = engine.Start(workerCtx); err != nil {
 		return err
 	}
-	api := &httpapi.Server{DB: db, Auth: authentication, Docker: d, Engine: engine, Notify: n, Config: cfg}
+	proxyManager := proxy.New(db, authentication, command.OSRunner{}, cfg.DataDir)
+	if err = proxyManager.Start(); err != nil {
+		return err
+	}
+	defer proxyManager.Close()
+	api := &httpapi.Server{Proxy: proxyManager, DB: db, Auth: authentication, Docker: d, Engine: engine, Notify: n, Config: cfg}
 	server := &http.Server{Addr: cfg.Listen, Handler: api.Router(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	failure := make(chan error, 1)
 	go func() {

@@ -26,3 +26,13 @@ export function Presence({ children }: { children: ReactNode }) {
 export function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
  return <div className={`collapse ${open ? 'is-open' : ''}`} aria-hidden={!open} inert={!open}><div className="collapse-inner">{children}</div></div>
 }
+
+// Keep the background still while dialogs are open; nested file pickers share the lock.
+let dialogLocks = 0
+let previousOverflow = ''
+export function useDialogScrollLock() {
+ useEffect(() => {
+  if (dialogLocks++ === 0) { previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden' }
+  return () => { if (--dialogLocks === 0) document.body.style.overflow = previousOverflow }
+ }, [])
+}
