@@ -40,7 +40,10 @@ html.theme-transition::view-transition-group(root){animation:none}
 html.theme-transition::view-transition-old(root),html.theme-transition::view-transition-new(root){animation:none;mix-blend-mode:normal}
 html.theme-transition::view-transition-old(root){z-index:1}
 html.theme-transition::view-transition-new(root){z-index:2}
-html.theme-transition *,html.theme-transition *::before,html.theme-transition *::after{transition:none!important}
+html.theme-transition *,html.theme-transition *::before,html.theme-transition *::after{transition:none!important;animation-play-state:paused!important}
+html.theme-transition::view-transition-image-pair(root){isolation:isolate}
+html.theme-transition::view-transition-new(root){will-change:clip-path}
+.theme-toggle:disabled{opacity:1;cursor:progress}
 :root[data-theme="dark"] .expanded-services{background:var(--surface-muted);border-color:var(--border)}
 :root[data-theme="dark"] .service-row>div:first-child,:root[data-theme="dark"] .service-row strong,:root[data-theme="dark"] .service-card-heading,:root[data-theme="dark"] .service-card-heading>strong{color:var(--text-secondary)}
 :root[data-theme="dark"] .service-row span,:root[data-theme="dark"] .service-meta,:root[data-theme="dark"] .service-meta code,:root[data-theme="dark"] .service-image,:root[data-theme="dark"] .container-row small,:root[data-theme="dark"] .container-row code{color:var(--text-muted)}
