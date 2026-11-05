@@ -1,9 +1,6 @@
 package proxy
 
 import (
-	"zhan/backend/internal/auth"
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/database"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -20,6 +17,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/database"
 )
 
 type Job struct {
@@ -177,6 +177,30 @@ func (m *Manager) Save(c Config) (Config, error) {
 	}
 	c.Settings.DuckToken = ""
 	return c, nil
+}
+
+// ImportConfiguration coordinates a configuration restore with gateway jobs and
+// saves. The callback persists the entire backup in one database transaction.
+func (m *Manager) ImportConfiguration(c Config, persist func(Config) error) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.busy {
+		return errors.New("Nginx 正在执行任务，请稍后导入")
+	}
+	if err := Normalize(&c); err != nil {
+		return err
+	}
+	old, err := m.load()
+	if err != nil {
+		return err
+	}
+	c.Settings.DuckToken = ""
+	if old.Settings.DuckDomain == c.Settings.DuckDomain {
+		c.Settings.DuckToken = old.Settings.DuckToken
+	}
+	c.Settings.TokenSet = c.Settings.DuckToken != ""
+	c.Revision = old.Revision + 1
+	return persist(c)
 }
 func (m *Manager) Enqueue(action, id, actor string) (Job, error) {
 	m.mu.Lock()

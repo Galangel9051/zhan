@@ -208,6 +208,7 @@ ZHAN_DOCKER_INTEGRATION=1 go test -v ./internal/deploy -run TestRealDockerLifecy
 
 ## 文档
 
+- [配置导入与导出](docs/configuration-backup.md)
 - [安装与 systemd](docs/install.md)
 - [Docker 部署](docs/docker.md)
 - [反向代理使用说明](docs/reverse-proxy.md)

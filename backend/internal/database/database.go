@@ -1,7 +1,6 @@
 package database
 
 import (
-	"zhan/backend/internal/model"
 	"database/sql"
 	"embed"
 	"encoding/json"
@@ -11,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"zhan/backend/internal/model"
 )
 
 //go:embed migrations/*.sql
@@ -101,12 +101,22 @@ func (s *Store) Stack(id int64) (model.Stack, error) {
 	return scanStack(s.QueryRow(stackSelect+"WHERE s.id=?", id))
 }
 func (s *Store) SaveStack(item *model.Stack, create bool) error {
-	files, _ := json.Marshal(item.Files)
 	tx, err := s.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if err := saveStack(tx, item, create); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func saveStack(tx *sql.Tx, item *model.Stack, create bool) error {
+	files, err := json.Marshal(item.Files)
+	if err != nil {
+		return err
+	}
 	if create {
 		result, err := tx.Exec("INSERT INTO compose_stacks(name,project_name,project_directory,compose_files,desired_state) VALUES(?,?,?,?,?)", item.Name, item.ProjectName, item.Directory, string(files), item.Desired)
 		if err != nil {
@@ -140,7 +150,7 @@ func (s *Store) SaveStack(item *model.Stack, create bool) error {
 	if err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 func (s *Store) Audit(user, action, target, result string) {
 	_, _ = s.Exec("INSERT INTO audit_logs(user,action,target,result) VALUES(?,?,?,?)", user, action, target, result)
@@ -204,12 +214,25 @@ func (s *Store) Tasks(stack, before int64, limit int) ([]model.Task, error) {
 var ErrBusy = errors.New("该项目已有排队或执行中的任务")
 
 func (s *Store) CreateTask(t *model.Task) error {
-	result, err := s.Exec("INSERT INTO tasks(stack_id,task_type,trigger_type,service,container_id,start_after_deploy,status) VALUES(?,?,?,?,?,?,'pending')", t.StackID, t.Type, t.Trigger, t.Service, t.Container, t.StartAfter)
+	query := "INSERT INTO tasks(stack_id,task_type,trigger_type,service,container_id,start_after_deploy,status) VALUES(?,?,?,?,?,?,'pending')"
+	args := []any{t.StackID, t.Type, t.Trigger, t.Service, t.Container, t.StartAfter}
+	if t.Trigger == "scheduled" {
+		// Recheck in the insert itself, even if a scheduler read an older config
+		// immediately before a restore paused automation.
+		query = "INSERT INTO tasks(stack_id,task_type,trigger_type,service,container_id,start_after_deploy,status) SELECT ?,?,?,?,?,?,'pending' FROM deployment_configs WHERE stack_id=? AND polling_enabled=1 AND (?='git_check' OR auto_deploy=1)"
+		args = append(args, t.StackID, t.Type)
+	}
+	result, err := s.Exec(query, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return ErrBusy
 		}
 		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return errors.New("项目的定时检查或自动部署已暂停")
 	}
 	t.ID, _ = result.LastInsertId()
 	return nil

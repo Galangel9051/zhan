@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Mail, Send, Save, Server, ShieldCheck, ScrollText, Bell, CheckCircle2, Settings2 } from 'lucide-react'
+import { Mail, Send, Save, Server, ShieldCheck, ScrollText, Bell, CheckCircle2, Settings2, ArrowRightLeft } from 'lucide-react'
 import { date, errorText, get, put, request, type Audit, type Notification, type Settings, type SMTP } from './api'
 import { Badge, ErrorBox } from './App'
+import ConfigurationTransfer from './ConfigurationTransfer'
 export default function SettingsPage() {
  const settings = useQuery({ queryKey: ['settings'], queryFn: () => get<Settings>('/settings') })
  const [tab, setTab] = useState('smtp')
- return <><div className="page-heading"><div><div className="eyebrow">SETTINGS</div><h1>配置好，安心运行<span>。</span></h1><p>管理邮件通知、日志保留与系统审计。</p></div></div><div className="tabs detail-tabs">{[{ key: 'smtp', label: '邮件通知', icon: Mail }, { key: 'system', label: '系统设置', icon: Settings2 }, { key: 'audit', label: '操作审计', icon: ScrollText }, { key: 'notifications', label: '通知记录', icon: Bell }].map(t => <button key={t.key} className={tab === t.key ? 'selected' : ''} onClick={() => setTab(t.key)}><t.icon size={15} />{t.label}</button>)}</div><ErrorBox error={settings.error} /><div className="tab-content motion-enter" key={tab}>{settings.isPending ? <div className="loading">正在读取设置…</div> : settings.data && <>{tab === 'smtp' && <SMTPForm initial={settings.data.smtp} />}{tab === 'system' && <SystemSettings settings={settings.data} />}</>}{tab === 'audit' && <AuditTable />}{tab === 'notifications' && <NotificationTable />}</div></>
+ return <><div className="page-heading"><div><div className="eyebrow">SETTINGS</div><h1>配置好，安心运行<span>。</span></h1><p>管理邮件通知、日志保留、配置备份与系统审计。</p></div></div><div className="tabs detail-tabs settings-tabs">{[{ key: 'smtp', label: '邮件通知', icon: Mail }, { key: 'system', label: '系统设置', icon: Settings2 }, { key: 'transfer', label: '导入导出', icon: ArrowRightLeft }, { key: 'audit', label: '操作审计', icon: ScrollText }, { key: 'notifications', label: '通知记录', icon: Bell }].map(t => <button key={t.key} className={tab === t.key ? 'selected' : ''} onClick={() => setTab(t.key)}><t.icon size={15} />{t.label}</button>)}</div><ErrorBox error={settings.error} /><div className="tab-content motion-enter" key={tab}>{settings.isPending ? <div className="loading">正在读取设置…</div> : settings.data && <>{tab === 'smtp' && <SMTPForm initial={settings.data.smtp} />}{tab === 'system' && <SystemSettings settings={settings.data} />}{tab === 'transfer' && <ConfigurationTransfer />}</>}{tab === 'audit' && <AuditTable />}{tab === 'notifications' && <NotificationTable />}</div></>
 }
 function SMTPForm({ initial }: { initial: SMTP }) {
  const [form, setForm] = useState({ ...initial, password: '' }), [recipients, setRecipients] = useState(initial.recipients.join('\n')), [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState(''), [testing,setTesting]=useState(false)
