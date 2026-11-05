@@ -5,5 +5,5 @@
   const dark = preference === 'dark' || (preference !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.content = dark ? '#101827' : '#f6f8fb'
+  if (meta) meta.content = dark ? '#212121' : '#ffffff'
 })()

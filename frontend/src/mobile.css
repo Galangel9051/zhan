@@ -4,7 +4,7 @@
 @media(max-width:760px){
  html{scroll-padding-bottom:100px}
  .workspace,.main-wrap,.page-content,.tab-content,.panel{min-width:0}
- .sidebar{inset:auto 0 0;width:100%;height:auto;padding:6px max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));border-right:0;border-top:1px solid var(--border,#e5eaf1);background:var(--surface,#fff);box-shadow:0 -5px 24px #13284708}
+ .sidebar{inset:auto 0 0;width:100%;height:auto;padding:6px max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));border-right:0;border-top:1px solid var(--border,#e5eaf1);background:var(--surface,#fff);box-shadow:0 -5px 24px #00000008}
  .sidebar>.brand,.sidebar>.sidebar-caption,.sidebar>.server-card,.sidebar>.sidebar-user{display:none}
  .sidebar .sliding-sidebar{flex-direction:row;gap:3px;margin:0;width:100%}
  .sidebar .sliding-sidebar .nav-item{flex:1;min-width:0;min-height:57px;flex-direction:column;gap:5px;padding:8px 2px;font-size:10px;text-align:center;justify-content:center;line-height:1.3}
@@ -155,7 +155,7 @@
  .task-table td:first-child:before,.task-table td:nth-child(4):before,.mobile-card-table td.card-action-cell:before{display:none}
  .task-table td:nth-child(4){position:absolute;top:14px;right:14px;padding:0}
  .mobile-card-table td.card-action-cell{justify-content:flex-end;padding-top:12px;margin-top:8px;border-top:1px solid var(--border,#e5eaf1)!important}
- .mobile-card-action{width:100%;justify-content:space-between;color:#3b82f6;font-size:12px}
+ .mobile-card-action{width:100%;justify-content:space-between;color:var(--accent);font-size:12px}
  .mobile-card-action .mobile-action-label{display:inline}
 
  /* Project rows and their expanded services become independently readable cards. */

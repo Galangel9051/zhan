@@ -9,7 +9,7 @@ const ThemeContext = createContext<{ theme: Theme; switching: boolean; toggle: (
 function savedTheme() { try { return localStorage.getItem(storageKey) } catch { return null } }
 function apply(theme: Theme) {
  document.documentElement.dataset.theme = theme
- document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#101827' : '#f6f8fb')
+ document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#212121' : '#ffffff')
 }
 export function ThemeProvider({ children }: { children: ReactNode }) {
  const [theme, setTheme] = useState<Theme>(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
