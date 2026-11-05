@@ -131,6 +131,7 @@ func (s *Server) Router() *gin.Engine {
 	}
 	api.POST("/stacks/:id/git/check", func(c *gin.Context) { s.enqueue(c, "git_check", "") })
 	api.POST("/stacks/:id/git/pull", func(c *gin.Context) { s.enqueue(c, "git_pull", "") })
+	api.GET("/stacks/:id/git/history", s.gitHistory)
 	api.GET("/stacks/:id/git/status", func(c *gin.Context) {
 		item, ok := s.getStack(c)
 		if ok {
