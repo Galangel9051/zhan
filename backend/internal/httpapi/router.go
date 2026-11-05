@@ -10,6 +10,7 @@ import (
 	"zhan/backend/internal/model"
 	"zhan/backend/internal/notify"
 	"zhan/backend/internal/proxy"
+	"zhan/backend/internal/sshkey"
 	"zhan/backend/internal/webui"
 	"context"
 	"crypto/subtle"
@@ -36,6 +37,7 @@ type Server struct {
 	Engine     *deploy.Engine
 	Notify     *notify.Notifier
 	Proxy      *proxy.Manager
+	Git        *sshkey.Manager
 	Config     config.Config
 	limitMu    sync.Mutex
 	attempts   map[string]attempt
@@ -83,7 +85,7 @@ func (s *Server) Router() *gin.Engine {
 			fail(c, 503, "数据库不可用")
 			return
 		}
-		c.JSON(200, gin.H{"status": "ok", "version": "1.0.0"})
+		c.JSON(200, gin.H{"status": "ok", "version": "1.1.0"})
 	})
 	api.GET("/auth/status", func(c *gin.Context) {
 		var count int
@@ -191,6 +193,10 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/tasks/:id/logs", s.logs)
 	api.GET("/tasks/:id/stream", s.stream)
 	api.GET("/settings", s.settings)
+	api.GET("/settings/git", s.gitSettings)
+	api.POST("/settings/git/regenerate", s.regenerateGitKey)
+	api.POST("/settings/git/test", s.testGitKey)
+	api.POST("/settings/git/known-hosts/reset", s.resetGitKnownHosts)
 	api.GET("/settings/config/export", s.exportConfiguration)
 	api.POST("/settings/config/import/preview", s.previewConfiguration)
 	api.POST("/settings/config/import", s.importConfiguration)
@@ -419,7 +425,7 @@ func (s *Server) validateStack(ctx context.Context, item *model.Stack) error {
 		return fmt.Errorf("Compose 配置校验失败：%w", err)
 	}
 	if err := s.Engine.ValidateGit(ctx, item); err != nil {
-		return fmt.Errorf("Git 绑定校验失败：%w。如果只需管理容器，可清空 Git 分支后重新导入", err)
+		return fmt.Errorf("Git 绑定校验失败：%w。如果只需管理容器，可清空 Git 分支后重新导入", deploy.ExplainGitError(err))
 	}
 	return nil
 }

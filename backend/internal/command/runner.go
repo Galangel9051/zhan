@@ -16,7 +16,12 @@ import (
 type Runner interface {
 	Run(context.Context, string, string, []string, io.Writer) error
 }
-type OSRunner struct{}
+
+// OSRunner executes host binaries. SSHCommand is the GIT_SSH_COMMAND used for
+// Git operations; an empty value keeps the conservative legacy behavior.
+type OSRunner struct {
+	SSHCommand string
+}
 type Error struct {
 	Code  int
 	Cause error
@@ -26,15 +31,20 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("命令执行失败（退出码 %d）: %v", e.Code, e.Cause)
 }
 func (e *Error) Unwrap() error { return e.Cause }
-func (OSRunner) Run(ctx context.Context, dir, name string, args []string, out io.Writer) error {
+func (r OSRunner) Run(ctx context.Context, dir, name string, args []string, out io.Writer) error {
 	// The administrator selected this working tree. Trust only that directory for
 	// this invocation: container root can differ from the host repository owner.
 	if name == "git" && dir != "" {
 		args = append([]string{"-c", "safe.directory=" + dir}, args...)
 	}
+	sshCommand := strings.TrimSpace(r.SSHCommand)
+	if sshCommand == "" {
+		sshCommand = "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes"
+	}
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_SSH_COMMAND=ssh -o BatchMode=yes -o StrictHostKeyChecking=yes", "GIT_CONFIG_NOSYSTEM=1", "COMPOSE_ANSI=never", "BUILDKIT_PROGRESS=plain")
+	cmd.Env = append(withoutEnv(os.Environ(), "GIT_TERMINAL_PROMPT", "GIT_SSH_COMMAND", "GIT_CONFIG_NOSYSTEM", "COMPOSE_ANSI", "BUILDKIT_PROGRESS"),
+		"GIT_TERMINAL_PROMPT=0", "GIT_SSH_COMMAND="+sshCommand, "GIT_CONFIG_NOSYSTEM=1", "COMPOSE_ANSI=never", "BUILDKIT_PROGRESS=plain")
 	cmd.Stdout = out
 	cmd.Stderr = out
 	// Metadata commands must not mix Docker warnings on stderr into JSON stdout.
@@ -98,6 +108,27 @@ func Capture(ctx context.Context, r Runner, dir, name string, args ...string) (s
 var secretURL = regexp.MustCompile(`(?i)(https?://)[^\s/@]+(?::[^\s/@]*)?@`)
 var secretKV = regexp.MustCompile(`(?i)((?:password|passwd|token|secret|authorization|api[_-]?key)["']?\s*[:=]\s*["']?)[^\s"']+`)
 var bearer = regexp.MustCompile(`(?i)Bearer\s+[A-Za-z0-9._~+/=-]+`)
+
+func withoutEnv(env []string, keys ...string) []string {
+	prefixes := make([]string, 0, len(keys))
+	for _, key := range keys {
+		prefixes = append(prefixes, key+"=")
+	}
+	result := env[:0]
+	for _, item := range env {
+		keep := true
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(item, prefix) {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			result = append(result, item)
+		}
+	}
+	return result
+}
 
 func Redact(s string) string {
 	s = secretURL.ReplaceAllString(s, "${1}[REDACTED]@")
