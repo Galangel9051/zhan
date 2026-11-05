@@ -1,5 +1,5 @@
 export const columnDefinitions = [
- { key: 'name', label: '名称 / 服务', width: 260, min: 200, max: 600, visible: true, required: true },
+ { key: 'name', label: '名称 / 容器', width: 260, min: 200, max: 600, visible: true, required: true },
  { key: 'status', label: '运行状态', width: 115, min: 100, max: 240, visible: true },
  { key: 'cpu', label: 'CPU', width: 100, min: 85, max: 220, visible: true },
  { key: 'memory', label: '内存占用', width: 165, min: 130, max: 320, visible: true },
