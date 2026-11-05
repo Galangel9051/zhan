@@ -155,6 +155,8 @@ Git 绑定使用现有的 `origin` 与当前分支。推荐为服务账户配置
 
 统一前缀 `/api/v1`。登录后取得 `csrf_token`，写请求需带 `X-CSRF-Token` 与会话 Cookie。
 
+部署历史支持 `GET /tasks?page=1&page_size=50&status=all`，返回 `data` 和 `pagination`（当前页、每页条数、总条数、总页数）。状态筛选覆盖全部任务。页码超出范围时返回最后一页；空结果返回第 1 页。原有 `limit` / `before` 游标接口仍可使用，不能与 `page` 混用。
+
 | 分组   | 端点                                                                                                    |
 | ---- | ----------------------------------------------------------------------------------------------------- |
 | 认证   | `POST /auth/login`、`POST /auth/logout`、`GET /auth/me`、`GET /auth/status`、`POST /auth/password`        |

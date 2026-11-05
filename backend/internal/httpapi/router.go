@@ -146,6 +146,10 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/stacks/:id/containers/:container/logs", s.containerLogs)
 	api.GET("/stacks/:id/services/:name/logs", s.containerLogs)
 	api.GET("/tasks", func(c *gin.Context) {
+		if c.Request.URL.Query().Has("page") {
+			s.pagedTasks(c)
+			return
+		}
 		stack, _ := strconv.ParseInt(c.Query("stack_id"), 10, 64)
 		before, _ := strconv.ParseInt(c.Query("before"), 10, 64)
 		items, err := s.DB.Tasks(stack, before, bounded(c.Query("limit"), 50, 1, 200))

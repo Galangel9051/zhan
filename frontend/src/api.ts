@@ -2,6 +2,7 @@ export interface User { id: number; username: string; csrf_token: string; must_c
 export interface Container { id: string; name: string; service: string; state: string; health: string; image: string; ports: string }
 export interface Service { name: string; image: string; build: boolean; dependencies: string[]; status: string; containers: Container[] }
 export interface Task { id: number; stack_id: number; stack_name: string; task_type: string; trigger_type: string; service: string; container_id: string; start_after_deploy: boolean; commit_sha: string; status: string; stage: string; exit_code: number; error_message: string; created_at: string; started_at: string; finished_at: string }
+export interface TaskPage { data: Task[]; pagination: { page: number; page_size: number; total: number; total_pages: number } }
 export interface Stack {
  id: number; name: string; project_name: string; project_directory: string; compose_files: string[]; desired_state: string; created_at: string;
  repository: string; branch: string; polling_enabled: boolean; poll_interval: number; auto_deploy: boolean; notify_on_failure: boolean; no_cache: boolean; build_pull: boolean; pull_images: boolean;
