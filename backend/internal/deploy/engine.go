@@ -1,12 +1,6 @@
 package deploy
 
 import (
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/config"
-	"zhan/backend/internal/database"
-	"zhan/backend/internal/docker"
-	"zhan/backend/internal/model"
-	"zhan/backend/internal/notify"
 	"context"
 	"database/sql"
 	"errors"
@@ -18,6 +12,13 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/model"
+	"zhan/backend/internal/notify"
 )
 
 type Engine struct {
@@ -226,8 +227,7 @@ func (e *Engine) execute(ctx context.Context, t *model.Task) {
 	} else {
 		t.Status = "failed"
 		t.ExitCode = -1
-		var exit *command.Error
-		if errors.As(err, &exit) {
+		if exit, ok := errors.AsType[*command.Error](err); ok {
 			t.ExitCode = exit.Code
 		}
 		t.Error = command.CleanError(err)

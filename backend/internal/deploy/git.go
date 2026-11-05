@@ -1,8 +1,6 @@
 package deploy
 
 import (
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/model"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +9,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/model"
 )
 
 var commitPattern = regexp.MustCompile(`^[0-9a-f]{40,64}$`)

@@ -1,11 +1,6 @@
 package deploy
 
 import (
-	"zhan/backend/internal/config"
-	"zhan/backend/internal/database"
-	"zhan/backend/internal/docker"
-	"zhan/backend/internal/model"
-	"zhan/backend/internal/testutil"
 	"context"
 	"errors"
 	"os"
@@ -13,6 +8,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/model"
+	"zhan/backend/internal/testutil"
 )
 
 func fixture(t *testing.T) (*Engine, *testutil.Fake, model.Stack) {

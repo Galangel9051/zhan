@@ -1,9 +1,6 @@
 package proxy
 
 import (
-	"zhan/backend/internal/auth"
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/database"
 	"context"
 	"errors"
 	"io"
@@ -13,6 +10,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/database"
 )
 
 type fakeRunner struct {

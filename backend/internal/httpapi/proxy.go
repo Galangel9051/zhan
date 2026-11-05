@@ -1,10 +1,12 @@
 package httpapi
 
 import (
-	"zhan/backend/internal/proxy"
 	"context"
-	"github.com/gin-gonic/gin"
 	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"zhan/backend/internal/proxy"
 )
 
 func (s *Server) proxyRoutes(api *gin.RouterGroup) {

@@ -1,6 +1,24 @@
 package httpapi
 
 import (
+	"context"
+	"crypto/subtle"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
 	"zhan/backend/internal/auth"
 	"zhan/backend/internal/command"
 	"zhan/backend/internal/config"
@@ -12,22 +30,6 @@ import (
 	"zhan/backend/internal/proxy"
 	"zhan/backend/internal/sshkey"
 	"zhan/backend/internal/webui"
-	"context"
-	"crypto/subtle"
-	"database/sql"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"github.com/gin-gonic/gin"
-	"io"
-	"log"
-	"net/http"
-	"net/url"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Server struct {
@@ -128,7 +130,6 @@ func (s *Server) Router() *gin.Engine {
 		c.JSON(200, gin.H{"data": item.Services, "runtime_error": item.RuntimeError})
 	})
 	for _, action := range []string{"start", "stop", "restart", "rebuild", "deploy"} {
-		action := action
 		api.POST("/stacks/:id/"+action, func(c *gin.Context) { s.enqueue(c, action, "") })
 	}
 	api.POST("/stacks/:id/git/check", func(c *gin.Context) { s.enqueue(c, "git_check", "") })
@@ -142,7 +143,6 @@ func (s *Server) Router() *gin.Engine {
 	})
 	api.PUT("/stacks/:id/polling", s.polling)
 	for _, action := range []string{"start", "stop", "restart"} {
-		action := action
 		api.POST("/stacks/:id/services/:name/"+action, func(c *gin.Context) { s.enqueue(c, action, c.Param("name")) })
 		api.POST("/stacks/:id/containers/:container/"+action, func(c *gin.Context) { s.enqueue(c, action, "") })
 	}

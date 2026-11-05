@@ -2,15 +2,16 @@ package httpapi
 
 import (
 	"bytes"
-	"zhan/backend/internal/auth"
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/database"
-	"zhan/backend/internal/proxy"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/proxy"
 )
 
 func TestProxyAuthenticationCSRFAndRevision(t *testing.T) {
