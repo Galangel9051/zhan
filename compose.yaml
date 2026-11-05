@@ -59,8 +59,11 @@ services:
       ZHAN_BIND_IP: ${ZHAN_BIND_IP:-127.0.0.1}
       ZHAN_PORT: ${ZHAN_PORT:-12345}
       ZHAN_SELF_UPDATE_INTERVAL: ${ZHAN_SELF_UPDATE_INTERVAL:-300}
-      GIT_SSH_COMMAND: "ssh -i /ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/ssh/known_hosts"
+      GIT_SSH_COMMAND: "ssh -F /dev/null -i /ssh/id_ed25519 -o IdentitiesOnly=yes -o IdentityAgent=none -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/ssh/known_hosts -o ConnectTimeout=15 -o AddressFamily=inet"
       TZ: ${TZ:-Asia/Shanghai}
+    # The app image's healthcheck probes port 12345, which the updater does not serve.
+    healthcheck:
+      disable: true
     volumes:
       - type: bind
         source: ${ZHAN_DOCKER_SOCKET:-/var/run/docker.sock}
