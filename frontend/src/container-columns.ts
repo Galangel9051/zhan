@@ -11,7 +11,7 @@ export const columnDefinitions = [
  { key: 'disk', label: '磁盘 I/O', width: 175, min: 145, max: 320, visible: false },
  { key: 'pids', label: 'PIDs', width: 85, min: 70, max: 160, visible: false },
  { key: 'id', label: '容器 ID', width: 145, min: 110, max: 360, visible: false },
- { key: 'started', label: '启动时间', width: 175, min: 140, max: 300, visible: false },
+ { key: 'started', label: '启动时间', width: 175, min: 140, max: 300, visible: true },
  { key: 'restarts', label: '重启次数', width: 95, min: 85, max: 180, visible: false },
  { key: 'actions', label: '操作', width: 95, min: 95, max: 180, visible: true, required: true },
 ] as const
