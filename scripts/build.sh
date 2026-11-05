@@ -13,5 +13,5 @@ npm --prefix frontend run build
 node scripts/prepare-web.mjs
 mkdir -p bin
 cd backend
-CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../bin/compose-manager ./cmd/server
-printf '\n构建完成：%s/bin/compose-manager\n' "$project_root"
+CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../bin/zhan ./cmd/server
+printf '\n构建完成：%s/bin/zhan\n' "$project_root"

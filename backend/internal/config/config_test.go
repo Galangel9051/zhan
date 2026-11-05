@@ -12,9 +12,9 @@ func TestUnrestrictedDefaultAndExplicitRoots(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	t.Setenv("CM_ALLOWED_ROOTS", "")
-	t.Setenv("CM_LISTEN", "")
-	t.Setenv("CM_DATA_DIR", "")
+	t.Setenv("ZHAN_ALLOWED_ROOTS", "")
+	t.Setenv("ZHAN_LISTEN", "")
+	t.Setenv("ZHAN_DATA_DIR", "")
 	cfg, err := Load("")
 	if err != nil || len(cfg.AllowedRoots) != 0 {
 		t.Fatalf("default should allow any accessible directory: %v %v", cfg.AllowedRoots, err)
@@ -25,12 +25,12 @@ func TestUnrestrictedDefaultAndExplicitRoots(t *testing.T) {
 	if err != nil || len(cfg.AllowedRoots) != 1 || cfg.AllowedRoots[0] != root {
 		t.Fatalf("explicit roots ignored: %v %v", cfg.AllowedRoots, err)
 	}
-	t.Setenv("CM_ALLOWED_ROOTS", string(filepath.Separator))
+	t.Setenv("ZHAN_ALLOWED_ROOTS", string(filepath.Separator))
 	cfg, err = Load(path)
 	if err != nil || len(cfg.AllowedRoots) != 1 || cfg.AllowedRoots[0] != string(filepath.Separator) {
 		t.Fatalf("explicit filesystem root rejected: %v %v", cfg.AllowedRoots, err)
 	}
-	t.Setenv("CM_ALLOWED_ROOTS", "")
+	t.Setenv("ZHAN_ALLOWED_ROOTS", "")
 	os.WriteFile(path, []byte("allowed_roots: []\n"), 0600)
 	cfg, err = Load(path)
 	if err != nil || len(cfg.AllowedRoots) != 0 {

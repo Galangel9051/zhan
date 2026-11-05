@@ -1,7 +1,7 @@
 package testutil
 
 import (
-	"compose-manager/backend/internal/command"
+	"zhan/backend/internal/command"
 	"context"
 	"encoding/json"
 	"fmt"

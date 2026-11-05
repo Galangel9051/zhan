@@ -1,8 +1,8 @@
 package deploy
 
 import (
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/model"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/model"
 	"context"
 	"os"
 	"path/filepath"

@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"compose-manager/backend/internal/command"
+	"zhan/backend/internal/command"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -32,8 +32,8 @@ func freePort(t *testing.T) int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 func TestManagedNginxHTTPAndHTTPS(t *testing.T) {
-	if os.Getenv("CM_PROXY_DOCKER_TEST") != "1" {
-		t.Skip("set CM_PROXY_DOCKER_TEST=1 for isolated Docker gateway integration")
+	if os.Getenv("ZHAN_PROXY_DOCKER_TEST") != "1" {
+		t.Skip("set ZHAN_PROXY_DOCKER_TEST=1 for isolated Docker gateway integration")
 	}
 	m := setup(t, command.OSRunner{})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)

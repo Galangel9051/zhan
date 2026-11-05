@@ -1,11 +1,11 @@
 package deploy
 
 import (
-	"compose-manager/backend/internal/config"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/docker"
-	"compose-manager/backend/internal/model"
-	"compose-manager/backend/internal/testutil"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/model"
+	"zhan/backend/internal/testutil"
 	"context"
 	"errors"
 	"os"
@@ -19,7 +19,7 @@ func fixture(t *testing.T) (*Engine, *testutil.Fake, model.Stack) {
 	t.Helper()
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	os.WriteFile(filepath.Join(root, "compose.yaml"), []byte("services: {}"), 0600)
-	db, err := database.Open(filepath.Join(t.TempDir(), "manager.db"))
+	db, err := database.Open(filepath.Join(t.TempDir(), "zhan.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

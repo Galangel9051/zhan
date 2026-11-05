@@ -1,14 +1,14 @@
 package database
 
 import (
-	"compose-manager/backend/internal/model"
+	"zhan/backend/internal/model"
 	"errors"
 	"path/filepath"
 	"testing"
 )
 
 func TestPersistenceConstraintsAndRecovery(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "manager.db")
+	path := filepath.Join(t.TempDir(), "zhan.db")
 	db, err := Open(path)
 	if err != nil {
 		t.Fatal(err)

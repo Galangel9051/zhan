@@ -27,6 +27,11 @@ func (e *Error) Error() string {
 }
 func (e *Error) Unwrap() error { return e.Cause }
 func (OSRunner) Run(ctx context.Context, dir, name string, args []string, out io.Writer) error {
+	// The administrator selected this working tree. Trust only that directory for
+	// this invocation: container root can differ from the host repository owner.
+	if name == "git" && dir != "" {
+		args = append([]string{"-c", "safe.directory=" + dir}, args...)
+	}
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_SSH_COMMAND=ssh -o BatchMode=yes -o StrictHostKeyChecking=yes", "GIT_CONFIG_NOSYSTEM=1", "COMPOSE_ANSI=never", "BUILDKIT_PROGRESS=plain")

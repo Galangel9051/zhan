@@ -1,15 +1,15 @@
 package main
 
 import (
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/config"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/deploy"
-	"compose-manager/backend/internal/docker"
-	"compose-manager/backend/internal/httpapi"
-	"compose-manager/backend/internal/notify"
-	"compose-manager/backend/internal/proxy"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/deploy"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/httpapi"
+	"zhan/backend/internal/notify"
+	"zhan/backend/internal/proxy"
 	"context"
 	"errors"
 	"flag"
@@ -41,19 +41,19 @@ func run() error {
 	if err = os.MkdirAll(cfg.DataDir, 0700); err != nil {
 		return err
 	}
-	db, err := database.Open(filepath.Join(cfg.DataDir, "manager.db"))
+	db, err := database.Open(filepath.Join(cfg.DataDir, "zhan.db"))
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 	// Hold a process lock so two schedulers cannot execute against one database.
-	lock, err := os.OpenFile(filepath.Join(cfg.DataDir, "manager.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	lock, err := os.OpenFile(filepath.Join(cfg.DataDir, "zhan.lock"), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}
 	defer lock.Close()
 	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		return errors.New("数据目录正由另一个 Compose Manager 进程使用")
+		return errors.New("数据目录正由另一个栈长进程使用")
 	}
 	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
 	authentication, err := auth.New(db, cfg.DataDir, cfg.SessionHours)
@@ -99,7 +99,7 @@ func run() error {
 	server := &http.Server{Addr: cfg.Listen, Handler: api.Router(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	failure := make(chan error, 1)
 	go func() {
-		log.Printf("Compose Manager listening on http://%s", cfg.Listen)
+		log.Printf("栈长已启动：http://%s", cfg.Listen)
 		failure <- server.ListenAndServe()
 	}()
 	select {

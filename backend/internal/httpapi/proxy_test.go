@@ -2,10 +2,10 @@ package httpapi
 
 import (
 	"bytes"
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/proxy"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/proxy"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +40,7 @@ func TestProxyAuthenticationCSRFAndRevision(t *testing.T) {
 		b, _ := json.Marshal(payload)
 		req := httptest.NewRequest(method, "/api/v1/proxy"+path, bytes.NewReader(b))
 		if session != "" {
-			req.AddCookie(&http.Cookie{Name: "cm_session", Value: session})
+			req.AddCookie(&http.Cookie{Name: "zhan_session", Value: session})
 		}
 		req.Header.Set("X-CSRF-Token", csrf)
 		rec := httptest.NewRecorder()

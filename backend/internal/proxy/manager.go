@@ -1,9 +1,9 @@
 package proxy
 
 import (
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/database"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/database"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -257,7 +257,7 @@ func (m *Manager) compose(ctx context.Context, path string, args ...string) (str
 }
 func (m *Manager) composeFile(s Settings, confDir string) ([]byte, error) {
 	ports := []string{net.JoinHostPort(s.Bind, strconv.Itoa(s.HTTPPort)) + ":80", net.JoinHostPort(s.Bind, strconv.Itoa(s.HTTPSPort)) + ":443"}
-	return yaml.Marshal(map[string]any{"services": map[string]any{"proxy": map[string]any{"image": "nginx:stable-alpine", "network_mode": "bridge", "restart": "unless-stopped", "ports": ports, "extra_hosts": []string{"host.docker.internal:host-gateway"}, "volumes": []any{map[string]any{"type": "bind", "source": confDir, "target": "/etc/nginx/cm", "read_only": true}, map[string]any{"type": "bind", "source": filepath.Join(m.Dir, "certs"), "target": "/etc/nginx/certs", "read_only": true}}, "command": []string{"nginx", "-c", "/etc/nginx/cm/nginx.conf", "-g", "daemon off;"}, "labels": map[string]string{"io.compose-manager.proxy": "true"}, "logging": map[string]any{"driver": "json-file", "options": map[string]string{"max-size": "10m", "max-file": "3"}}}}})
+	return yaml.Marshal(map[string]any{"services": map[string]any{"proxy": map[string]any{"image": "nginx:stable-alpine", "network_mode": "bridge", "restart": "unless-stopped", "ports": ports, "extra_hosts": []string{"host.docker.internal:host-gateway"}, "volumes": []any{map[string]any{"type": "bind", "source": confDir, "target": "/etc/nginx/cm", "read_only": true}, map[string]any{"type": "bind", "source": filepath.Join(m.Dir, "certs"), "target": "/etc/nginx/certs", "read_only": true}}, "command": []string{"nginx", "-c", "/etc/nginx/cm/nginx.conf", "-g", "daemon off;"}, "labels": map[string]string{"io.zhan.proxy": "true"}, "logging": map[string]any{"driver": "json-file", "options": map[string]string{"max-size": "10m", "max-file": "3"}}}}})
 }
 func atomicWrite(path string, data []byte) error {
 	f, err := os.CreateTemp(filepath.Dir(path), ".pending-")

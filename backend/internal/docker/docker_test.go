@@ -1,8 +1,8 @@
 package docker
 
 import (
-	"compose-manager/backend/internal/model"
-	"compose-manager/backend/internal/testutil"
+	"zhan/backend/internal/model"
+	"zhan/backend/internal/testutil"
 	"context"
 	"os"
 	"path/filepath"

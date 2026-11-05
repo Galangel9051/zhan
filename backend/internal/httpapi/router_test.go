@@ -2,14 +2,14 @@ package httpapi
 
 import (
 	"bytes"
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/config"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/deploy"
-	"compose-manager/backend/internal/docker"
-	"compose-manager/backend/internal/model"
-	"compose-manager/backend/internal/notify"
-	"compose-manager/backend/internal/testutil"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/deploy"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/model"
+	"zhan/backend/internal/notify"
+	"zhan/backend/internal/testutil"
 	"context"
 	"encoding/json"
 	"io"
@@ -28,7 +28,7 @@ func TestAuthenticatedImportTaskLogsAndSettings(t *testing.T) {
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	os.WriteFile(filepath.Join(root, "compose.yaml"), []byte("services: {}"), 0600)
 	dir := t.TempDir()
-	db, err := database.Open(filepath.Join(dir, "manager.db"))
+	db, err := database.Open(filepath.Join(dir, "zhan.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func mustURL(t *testing.T, value string) *url.URL {
 
 func TestBootstrapPasswordGate(t *testing.T) {
 	dir := t.TempDir()
-	db, err := database.Open(filepath.Join(dir, "manager.db"))
+	db, err := database.Open(filepath.Join(dir, "zhan.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

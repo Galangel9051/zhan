@@ -1,5 +1,5 @@
 [Unit]
-Description=Compose Manager
+Description=栈长 · Compose 部署管理台
 After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service
@@ -7,11 +7,11 @@ Requires=docker.service
 [Service]
 Type=simple
 # 创建专用账户并授予受管项目和 Docker 所需权限；不要直接复制未知账户配置。
-User=compose-manager
-Group=compose-manager
+User=zhan
+Group=zhan
 SupplementaryGroups=docker
-WorkingDirectory=/opt/compose-manager
-ExecStart=/opt/compose-manager/compose-manager --config /opt/compose-manager/config.yaml
+WorkingDirectory=/opt/zhan
+ExecStart=/opt/zhan/zhan --config /opt/zhan/config.yaml
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=60

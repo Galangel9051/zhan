@@ -1,7 +1,7 @@
 package database
 
 import (
-	"compose-manager/backend/internal/model"
+	"zhan/backend/internal/model"
 	"database/sql"
 	"embed"
 	"encoding/json"

@@ -1,16 +1,16 @@
 package httpapi
 
 import (
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/config"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/deploy"
-	"compose-manager/backend/internal/docker"
-	"compose-manager/backend/internal/model"
-	"compose-manager/backend/internal/notify"
-	"compose-manager/backend/internal/proxy"
-	"compose-manager/backend/internal/webui"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/deploy"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/model"
+	"zhan/backend/internal/notify"
+	"zhan/backend/internal/proxy"
+	"zhan/backend/internal/webui"
 	"context"
 	"crypto/subtle"
 	"database/sql"
@@ -95,7 +95,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/auth/me", func(c *gin.Context) { c.JSON(200, gin.H{"data": user(c)}) })
 	api.POST("/auth/password", s.changePassword)
 	api.POST("/auth/logout", func(c *gin.Context) {
-		token, _ := c.Cookie("cm_session")
+		token, _ := c.Cookie("zhan_session")
 		s.Auth.Logout(token)
 		s.cookie(c, "", -1)
 		c.Status(204)
@@ -225,12 +225,14 @@ func (s *Server) Router() *gin.Engine {
 			fail(c, 404, "接口不存在")
 			return
 		}
+		// Gin 进入 NoRoute 前已把状态码预设为 404；这里交回前端决定最终状态码。
+		c.Status(http.StatusOK)
 		webui.Handler().ServeHTTP(c.Writer, c.Request)
 	})
 	return r
 }
 func (s *Server) session(c *gin.Context) {
-	token, _ := c.Cookie("cm_session")
+	token, _ := c.Cookie("zhan_session")
 	u, err := s.Auth.Session(token)
 	if err != nil {
 		fail(c, 401, "请先登录")
@@ -254,7 +256,7 @@ func (s *Server) session(c *gin.Context) {
 	c.Next()
 }
 func (s *Server) cookie(c *gin.Context, value string, maxAge int) {
-	http.SetCookie(c.Writer, &http.Cookie{Name: "cm_session", Value: value, Path: "/", MaxAge: maxAge, HttpOnly: true, Secure: s.Config.SecureCookies, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(c.Writer, &http.Cookie{Name: "zhan_session", Value: value, Path: "/", MaxAge: maxAge, HttpOnly: true, Secure: s.Config.SecureCookies, SameSite: http.SameSiteStrictMode})
 }
 func (s *Server) allowLogin(ip string) bool {
 	s.limitMu.Lock()
@@ -617,7 +619,7 @@ func (s *Server) stream(c *gin.Context) {
 		}
 	}
 }
-func cookieValue(c *gin.Context) string { v, _ := c.Cookie("cm_session"); return v }
+func cookieValue(c *gin.Context) string { v, _ := c.Cookie("zhan_session"); return v }
 func (s *Server) containerLogs(c *gin.Context) {
 	stack, ok := s.getStack(c)
 	if !ok {

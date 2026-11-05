@@ -1,10 +1,10 @@
 package notify
 
 import (
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/model"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/model"
 	"crypto/tls"
 	"database/sql"
 	"errors"
@@ -195,8 +195,8 @@ func (n *Notifier) Failure(t model.Task, s model.Stack) {
 	if count > 0 {
 		return
 	}
-	body := fmt.Sprintf("项目：%s\n分支：%s\nCommit：%s\n执行时间（UTC）：%s\n失败阶段：%s\n退出码：%d\n\n错误摘要：\n%s\n\n请登录 Compose Manager 查看任务 #%d 完整日志。", s.Name, s.Branch, t.Commit, database.Now(), t.Stage, t.ExitCode, t.Error, t.ID)
-	err = n.Send(cfg, "[Compose Manager] "+s.Name+" 执行失败", body)
+	body := fmt.Sprintf("项目：%s\n分支：%s\nCommit：%s\n执行时间（UTC）：%s\n失败阶段：%s\n退出码：%d\n\n错误摘要：\n%s\n\n请登录栈长查看任务 #%d 完整日志。", s.Name, s.Branch, t.Commit, database.Now(), t.Stage, t.ExitCode, t.Error, t.ID)
+	err = n.Send(cfg, "[栈长] "+s.Name+" 执行失败", body)
 	status := "success"
 	if err != nil {
 		status = "failed"
@@ -218,7 +218,7 @@ func (n *Notifier) TestConfig(cfg model.SMTP) error {
 	if cfg.Cooldown == 0 {
 		cfg.Cooldown = 30
 	}
-	err := n.Send(cfg, "[Compose Manager] 测试邮件", "SMTP 配置验证成功。\n此邮件由管理员手动触发，使用当前填写的配置。")
+	err := n.Send(cfg, "[栈长] 测试邮件", "SMTP 配置验证成功。\n此邮件由管理员手动触发，使用当前填写的配置。")
 	if err != nil && cfg.Password != "" {
 		err = errors.New(strings.ReplaceAll(err.Error(), cfg.Password, "[REDACTED]"))
 	}

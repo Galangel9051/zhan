@@ -1,8 +1,8 @@
 package docker
 
 import (
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/model"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/model"
 	"context"
 	"encoding/json"
 	"errors"
@@ -53,10 +53,10 @@ func (c *Client) Allowed(path string) (string, error) {
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("路径不存在：%s。请确认填写的是运行 Compose Manager 的服务器上的路径", path)
+			return "", fmt.Errorf("路径不存在：%s。请确认填写的是运行栈长的服务器上的路径", path)
 		}
 		if os.IsPermission(err) {
-			return "", fmt.Errorf("无权访问路径：%s。请为运行 Compose Manager 的账户授予读取权限", path)
+			return "", fmt.Errorf("无权访问路径：%s。请为运行栈长的账户授予读取权限", path)
 		}
 		return "", fmt.Errorf("无法读取路径 %s：%w", path, err)
 	}
@@ -73,7 +73,7 @@ func (c *Client) Allowed(path string) (string, error) {
 			return real, nil
 		}
 	}
-	return "", fmt.Errorf("路径 %s 不在允许管理的目录中。当前允许目录：%s。请在配置文件的 allowed_roots 中加入项目所在目录，或设置 CM_ALLOWED_ROOTS，然后重启服务", real, strings.Join(c.Roots, "、"))
+	return "", fmt.Errorf("路径 %s 不在允许管理的目录中。当前允许目录：%s。请在配置文件的 allowed_roots 中加入项目所在目录，或设置 ZHAN_ALLOWED_ROOTS，然后重启服务", real, strings.Join(c.Roots, "、"))
 }
 func (c *Client) Validate(s *model.Stack) error {
 	if !projectName.MatchString(s.ProjectName) {

@@ -2,7 +2,7 @@ package deploy
 
 import (
 	"bytes"
-	"compose-manager/backend/internal/command"
+	"zhan/backend/internal/command"
 	"fmt"
 	"io"
 	"os"

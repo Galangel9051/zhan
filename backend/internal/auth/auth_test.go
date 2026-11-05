@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"compose-manager/backend/internal/database"
+	"zhan/backend/internal/database"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,7 +9,7 @@ import (
 
 func TestAdminSessionAndEncryption(t *testing.T) {
 	dir := t.TempDir()
-	db, err := database.Open(filepath.Join(dir, "manager.db"))
+	db, err := database.Open(filepath.Join(dir, "zhan.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestAdminSessionAndEncryption(t *testing.T) {
 
 func TestDefaultPasswordRequiresChangeAndIsNotRecreated(t *testing.T) {
 	dir := t.TempDir()
-	db, err := database.Open(filepath.Join(dir, "manager.db"))
+	db, err := database.Open(filepath.Join(dir, "zhan.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

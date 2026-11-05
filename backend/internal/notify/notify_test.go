@@ -2,9 +2,9 @@ package notify
 
 import (
 	"bufio"
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/model"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/model"
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -67,7 +67,7 @@ func TestFailureNotificationDedupAndIndependentError(t *testing.T) {
 		}
 	}()
 	dir := t.TempDir()
-	db, err := database.Open(filepath.Join(dir, "manager.db"))
+	db, err := database.Open(filepath.Join(dir, "zhan.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestUnsavedSMTPTestUsesEnteredPasswordWithoutSaving(t *testing.T) {
 		}
 	}()
 	dir := t.TempDir()
-	db, err := database.Open(filepath.Join(dir, "manager.db"))
+	db, err := database.Open(filepath.Join(dir, "zhan.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

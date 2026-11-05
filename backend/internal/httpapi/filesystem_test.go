@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/config"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/docker"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/docker"
 )
 
 type browserResponse struct {
@@ -47,7 +47,7 @@ func TestFilesystemBrowserPermissionsPaginationAndMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := t.TempDir()
-	db, err := database.Open(filepath.Join(data, "manager.db"))
+	db, err := database.Open(filepath.Join(data, "zhan.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestFilesystemBrowserPermissionsPaginationAndMetadata(t *testing.T) {
 		t.Helper()
 		req, _ := http.NewRequest("GET", server.URL+"/api/v1/filesystem"+path, nil)
 		if authenticated {
-			req.AddCookie(&http.Cookie{Name: "cm_session", Value: token})
+			req.AddCookie(&http.Cookie{Name: "zhan_session", Value: token})
 		}
 		response, err := http.DefaultClient.Do(req)
 		if err != nil {

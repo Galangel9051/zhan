@@ -1,12 +1,12 @@
 package deploy
 
 import (
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/config"
-	"compose-manager/backend/internal/database"
-	"compose-manager/backend/internal/docker"
-	"compose-manager/backend/internal/model"
-	"compose-manager/backend/internal/notify"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/model"
+	"zhan/backend/internal/notify"
 	"context"
 	"database/sql"
 	"errors"

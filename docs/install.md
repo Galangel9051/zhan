@@ -1,6 +1,6 @@
 # Linux 宿主机安装
 
-Compose Manager 直接运行在 Linux 上，使用宿主机的 Docker、Compose 插件和 Git，不需要 Node.js 常驻或独立数据库。
+栈长直接运行在 Linux 上，使用宿主机的 Docker、Compose 插件和 Git，不需要 Node.js 常驻或独立数据库。
 
 ## 1. 构建
 
@@ -12,27 +12,27 @@ nvm use
 ./scripts/build.sh
 ```
 
-结果为 `bin/compose-manager`，包含前端静态文件，SQLite 驱动为纯 Go。Linux 上原生构建即可；macOS 交叉编译 Linux 示例：
+结果为 `bin/zhan`，包含前端静态文件，SQLite 驱动为纯 Go。Linux 上原生构建即可；macOS 交叉编译 Linux 示例：
 
 ```sh
 # 先完成 ./scripts/build.sh，再选择目标架构。
 cd backend
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o ../bin/compose-manager-linux-amd64 ./cmd/server
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o ../bin/zhan-linux-amd64 ./cmd/server
 ```
 
 ARM64 服务器将 `GOARCH` 改为 `arm64`。平台目前支持 Linux、macOS；进程锁和子进程组取消实现依赖 Unix。
 
 ## 2. 账户与目录
 
-由服务器管理员创建专用 `compose-manager` 账户，将其加入 Docker 组，并赋予受管项目所需的读写权限。Docker 组本身具有很高的宿主机权限，务必仅授予可信管理员管理平台访问权。
+由服务器管理员创建专用 `zhan` 账户，将其加入 Docker 组，并赋予受管项目所需的读写权限。Docker 组本身具有很高的宿主机权限，务必仅授予可信管理员管理平台访问权。
 
 ```sh
-sudo useradd --system --create-home --shell /usr/sbin/nologin compose-manager
-sudo usermod -aG docker compose-manager
-sudo mkdir -p /opt/compose-manager/data
-sudo install -m 0755 bin/compose-manager /opt/compose-manager/compose-manager
-sudo cp configs/config.example.yaml /opt/compose-manager/config.yaml
-sudo chown -R compose-manager:compose-manager /opt/compose-manager
+sudo useradd --system --create-home --shell /usr/sbin/nologin zhan
+sudo usermod -aG docker zhan
+sudo mkdir -p /opt/zhan/data
+sudo install -m 0755 bin/zhan /opt/zhan/zhan
+sudo cp configs/config.example.yaml /opt/zhan/config.yaml
+sudo chown -R zhan:zhan /opt/zhan
 ```
 
 默认 `allowed_roots: []` 不限定目录，导入窗口可浏览选择服务账户有权限访问的任意目录和 Compose 文件。若管理员显式填写目录列表，则按该列表校验，符号链接解析后也必须符合配置。Compose 覆盖文件可位于项目目录之外。
@@ -46,9 +46,9 @@ sudo chown -R compose-manager:compose-manager /opt/compose-manager
 确保服务账户可访问 Docker 和仓库：
 
 ```sh
-sudo -u compose-manager docker compose version
-sudo -u compose-manager git -C /opt/projects/example status
-sudo -u compose-manager git -C /opt/projects/example ls-remote origin refs/heads/main
+sudo -u zhan docker compose version
+sudo -u zhan git -C /opt/projects/example status
+sudo -u zhan git -C /opt/projects/example ls-remote origin refs/heads/main
 ```
 
 界面绑定现有 `origin`，不自动克隆仓库、创建凭据、切换分支或修改 remote。不接受在 HTTP(S) 仓库地址内嵌密码或令牌；Git 自身的授权凭据助手也可由服务器管理员配置。
@@ -67,29 +67,29 @@ sudo -u compose-manager git -C /opt/projects/example ls-remote origin refs/heads
 可选的预初始化命令（通常不需要）：
 
 ```sh
-sudo -u compose-manager /opt/compose-manager/compose-manager \
-  --config /opt/compose-manager/config.yaml --init-admin
+sudo -u zhan /opt/zhan/zhan \
+  --config /opt/zhan/config.yaml --init-admin
 ```
 
 该命令仅创建同样需要首次改密的默认账户；不读取终端密码，不覆盖已有账户。
 
 ## 5. systemd
 
-检查并调整 `configs/compose-manager.service` 的账户、安装目录和 Docker 组设置，然后安装：
+检查并调整 `configs/zhan.service` 的账户、安装目录和 Docker 组设置，然后安装：
 
 ```sh
-sudo install -m 0644 configs/compose-manager.service /etc/systemd/system/compose-manager.service
+sudo install -m 0644 configs/zhan.service /etc/systemd/system/zhan.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now compose-manager
-sudo systemctl status compose-manager
-sudo journalctl -u compose-manager -f
+sudo systemctl enable --now zhan
+sudo systemctl status zhan
+sudo journalctl -u zhan -f
 ```
 
-默认仅监听 `127.0.0.1:18080`。通过 SSH 隧道访问，或放在可信 HTTPS 内网反向代理后；配置 `secure_cookies: true` 后 Cookie 仅能经 HTTPS 使用。反向代理需保持 `Host`，SSE 路径关闭缓冲并允许长连接：
+默认仅监听 `127.0.0.1:12345`。通过 SSH 隧道访问，或放在可信 HTTPS 内网反向代理后；配置 `secure_cookies: true` 后 Cookie 仅能经 HTTPS 使用。反向代理需保持 `Host`，SSE 路径关闭缓冲并允许长连接：
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:18080;
+    proxy_pass http://127.0.0.1:12345;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_http_version 1.1;
@@ -112,7 +112,7 @@ location / {
 
 ## 7. 备份与升级
 
-停止服务后备份整个 `data/`，包含 `manager.db`、`secret.key` 和日志。`secret.key` 丢失会导致已保存 SMTP 凭据无法解密；只复制数据库不足以完整恢复。
+停止服务后备份整个 `data/`，包含 `zhan.db`、`secret.key` 和日志。`secret.key` 丢失会导致已保存 SMTP 凭据无法解密；只复制数据库不足以完整恢复。
 
 升级前备份数据，然后替换二进制、重启服务。迁移在启动时按版本事务执行，文件位于 `backend/internal/database/migrations/`。原待办示例的 `app.db` 不会被读取或删除。
 

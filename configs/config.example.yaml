@@ -1,6 +1,6 @@
 # 相对路径以服务的工作目录为基准。
-listen: 127.0.0.1:18080
-# 正式部署请使用 /opt/compose-manager/data 或其他专用目录。
+listen: 127.0.0.1:12345
+# 正式部署请使用 /opt/zhan/data 或其他专用目录。
 data_dir: data
 # 默认不限目录，使用服务器账户的文件系统权限；可在导入窗口自由浏览选择。
 allowed_roots: []

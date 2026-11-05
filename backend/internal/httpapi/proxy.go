@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"compose-manager/backend/internal/proxy"
+	"zhan/backend/internal/proxy"
 	"context"
 	"github.com/gin-gonic/gin"
 	"time"

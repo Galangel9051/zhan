@@ -1,0 +1,40 @@
+name: zhan
+services:
+  app:
+    image: zhan:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${ZHAN_BIND_IP:-127.0.0.1}:${ZHAN_PORT:-12345}:12345"
+    environment:
+      ZHAN_LISTEN: 0.0.0.0:12345
+      ZHAN_DATA_DIR: ${ZHAN_HOST_DATA_DIR:?Run scripts/docker-up.sh or set ZHAN_HOST_DATA_DIR}
+      TZ: ${TZ:-Asia/Shanghai}
+    # Keep paths identical: sibling containers resolve binds on the Docker host.
+    volumes:
+      - type: bind
+        source: ${ZHAN_DOCKER_SOCKET:-/var/run/docker.sock}
+        target: /var/run/docker.sock
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ZHAN_HOST_PROJECTS_ROOT:?Run scripts/docker-up.sh or set ZHAN_HOST_PROJECTS_ROOT}
+        target: ${ZHAN_HOST_PROJECTS_ROOT}
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ZHAN_HOST_DATA_DIR}
+        target: ${ZHAN_HOST_DATA_DIR}
+        bind:
+          create_host_path: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    stop_grace_period: 45s

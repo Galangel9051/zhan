@@ -4,7 +4,7 @@ import { Moon, Sun } from 'lucide-react'
 import { revealTheme } from './theme-transition'
 type Theme = 'light' | 'dark'
 type Origin = { x: number; y: number }
-const storageKey = 'compose-manager-theme'
+const storageKey = 'zhan-theme'
 const ThemeContext = createContext<{ theme: Theme; switching: boolean; toggle: (origin: Origin) => void } | null>(null)
 function savedTheme() { try { return localStorage.getItem(storageKey) } catch { return null } }
 function apply(theme: Theme) {

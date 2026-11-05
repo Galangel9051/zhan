@@ -147,7 +147,7 @@ func (m *Manager) issue(ctx context.Context, h Host, s Settings) error {
 	if transport == nil {
 		transport = &http.Client{Timeout: 30 * time.Second}
 	}
-	client := &acme.Client{Key: key, DirectoryURL: directory, HTTPClient: transport, UserAgent: "Compose-Manager/1.0"}
+	client := &acme.Client{Key: key, DirectoryURL: directory, HTTPClient: transport, UserAgent: "Zhan/1.0"}
 	_, err = client.Register(ctx, &acme.Account{Contact: []string{"mailto:" + s.Email}}, acme.AcceptTOS)
 	if err != nil {
 		return fmt.Errorf("注册证书账户失败：%w", err)

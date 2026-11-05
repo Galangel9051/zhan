@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"compose-manager/backend/internal/database"
+	"zhan/backend/internal/database"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"

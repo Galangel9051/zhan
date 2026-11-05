@@ -1,9 +1,9 @@
 package proxy
 
 import (
-	"compose-manager/backend/internal/auth"
-	"compose-manager/backend/internal/command"
-	"compose-manager/backend/internal/database"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/database"
 	"context"
 	"errors"
 	"io"

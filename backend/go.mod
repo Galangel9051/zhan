@@ -1,4 +1,4 @@
-module compose-manager/backend
+module zhan/backend
 
 go 1.26.0
 

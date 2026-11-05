@@ -40,7 +40,7 @@ DuckDNS TXT 在同一主域名的子域名间共享，证书任务在工具内�
 ./scripts/check.sh
 cd backend
 # 独立临时网关：仅随机的本机端口、临时证书与临时上游，结束后清理。
-CM_PROXY_DOCKER_TEST=1 go test -v ./internal/proxy -run TestManagedNginxHTTPAndHTTPS
+ZHAN_PROXY_DOCKER_TEST=1 go test -v ./internal/proxy -run TestManagedNginxHTTPAndHTTPS
 ```
 
 测试包括上游/域名注入防护、配置版本冲突、凭据加密与不回显、失败任务、模拟完整 ACME DNS-01 签发及 TXT 清理、证书原子替换、校验失败不替换配置、启动失败恢复旧配置。真实 Docker 测试验证 HTTP、带域名验证的 HTTPS、转发头、非标准端口跳转、重载以及错误配置下原服务仍可访问。没有修改真实 DuckDNS 解析或签发真实证书；需配置实际账户后验收。

@@ -24,7 +24,7 @@ type Config struct {
 }
 
 func Load(path string) (Config, error) {
-	c := Config{Listen: "127.0.0.1:18080", DataDir: "data", AllowedRoots: []string{}, SessionHours: 12, Workers: 1, TaskTimeoutMinutes: 30, LogRetentionDays: 30, MaxLogMB: 20, RetryDelays: []int{300, 900}}
+	c := Config{Listen: "127.0.0.1:12345", DataDir: "data", AllowedRoots: []string{}, SessionHours: 12, Workers: 1, TaskTimeoutMinutes: 30, LogRetentionDays: 30, MaxLogMB: 20, RetryDelays: []int{300, 900}}
 	if path != "" {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -36,13 +36,13 @@ func Load(path string) (Config, error) {
 			return c, err
 		}
 	}
-	if v := os.Getenv("CM_LISTEN"); v != "" {
+	if v := os.Getenv("ZHAN_LISTEN"); v != "" {
 		c.Listen = v
 	}
-	if v := os.Getenv("CM_DATA_DIR"); v != "" {
+	if v := os.Getenv("ZHAN_DATA_DIR"); v != "" {
 		c.DataDir = v
 	}
-	if v := os.Getenv("CM_ALLOWED_ROOTS"); v != "" {
+	if v := os.Getenv("ZHAN_ALLOWED_ROOTS"); v != "" {
 		c.AllowedRoots = filepath.SplitList(v)
 	}
 	if c.AllowedRoots == nil {
