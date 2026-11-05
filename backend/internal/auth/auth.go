@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"zhan/backend/internal/database"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -10,12 +9,16 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"golang.org/x/crypto/argon2"
+	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"golang.org/x/crypto/argon2"
+
+	"zhan/backend/internal/database"
 )
 
 type Auth struct {
@@ -31,28 +34,76 @@ type User struct {
 }
 
 func New(db *database.Store, dir string, hours int) (*Auth, error) {
-	path := filepath.Join(dir, "secret.key")
-	key, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		key = make([]byte, 32)
-		if _, err = rand.Read(key); err != nil {
+	key, err := loadKey(db, dir)
+	if err != nil {
+		return nil, err
+	}
+	return &Auth{DB: db, key: key, Hours: hours}, nil
+}
+
+func loadKey(db *database.Store, dir string) ([]byte, error) {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, fmt.Errorf("打开密钥目录失败：%w", err)
+	}
+	defer root.Close()
+	stat, err := root.Lstat("secret.key")
+	if errors.Is(err, os.ErrNotExist) {
+		var count int
+		// Never create a new master key over credentials encrypted with a lost key.
+		if err := db.QueryRow(`SELECT (SELECT count(*) FROM credentials) + (SELECT count(*) FROM app_settings WHERE key LIKE 'proxy_acme_account_%')`).Scan(&count); err != nil {
 			return nil, err
 		}
-		f, e := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-		if e != nil {
-			return nil, e
+		if count != 0 {
+			return nil, errors.New("secret.key 已丢失，数据库中仍有加密凭据；请恢复原密钥后再启动")
 		}
-		_, err = f.Write(key)
-		f.Close()
+		key := make([]byte, 32)
+		if _, err := rand.Read(key); err != nil {
+			return nil, err
+		}
+		file, err := root.OpenFile("secret.key", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if err != nil {
+			return nil, err
+		}
+		_, writeErr := file.Write(key)
+		syncErr := file.Sync()
+		closeErr := file.Close()
+		if err := errors.Join(writeErr, syncErr, closeErr); err != nil {
+			return nil, errors.Join(fmt.Errorf("保存加密密钥失败：%w", err), root.Remove("secret.key"))
+		}
+		parent, err := root.Open(".")
+		if err != nil {
+			return nil, err
+		}
+		if err := errors.Join(parent.Sync(), parent.Close()); err != nil {
+			return nil, err
+		}
+		return key, nil
 	}
+	if err != nil {
+		return nil, err
+	}
+	if !stat.Mode().IsRegular() {
+		return nil, errors.New("secret.key 必须是普通文件，不能使用符号链接")
+	}
+	file, err := root.Open("secret.key")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	if err := file.Chmod(0600); err != nil {
+		return nil, fmt.Errorf("修正加密密钥权限失败：%w", err)
+	}
+	key, err := io.ReadAll(io.LimitReader(file, 33))
 	if err != nil {
 		return nil, err
 	}
 	if len(key) != 32 {
 		return nil, errors.New("secret.key must contain exactly 32 bytes")
 	}
-	return &Auth{db, key, hours}, nil
+	return key, nil
 }
+
 func Hash(password string) (string, error) {
 	if utf8.RuneCountInString(password) < 6 || len(password) > 128 {
 		return "", errors.New("密码至少 6 个字符，最多 128 字节")
@@ -146,7 +197,10 @@ func (a *Auth) Encrypt(value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	gcm, _ := cipher.NewGCM(block)
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err = rand.Read(nonce); err != nil {
 		return "", err
@@ -158,8 +212,14 @@ func (a *Auth) Decrypt(value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	block, _ := aes.NewCipher(a.key)
-	gcm, _ := cipher.NewGCM(block)
+	block, err := aes.NewCipher(a.key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
 	if len(data) < gcm.NonceSize() {
 		return "", errors.New("invalid ciphertext")
 	}

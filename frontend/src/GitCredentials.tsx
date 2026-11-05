@@ -125,7 +125,7 @@ export default function GitCredentials() {
     <div className="section-heading"><h2><RefreshCw size={17} />密钥维护</h2><span className="subtle">谨慎操作</span></div>
     <div className="git-credential-body git-danger-body">
      <div className="git-danger-row">
-      <div><strong>重新生成密钥</strong><p>旧公钥会立即失效，需要到所有 Git 平台删除旧公钥并添加新公钥。</p></div>
+      <div><strong>重新生成密钥</strong><p>栈长将改用新密钥。请到所有 Git 平台撤销旧公钥并添加新公钥。</p></div>
       {confirmRegenerate ? <div className="git-confirm"><span>确认重新生成？</span><button type="button" className="button" disabled={busy !== null} onClick={() => setConfirmRegenerate(false)}>取消</button><button type="button" className="button primary" disabled={busy !== null} onClick={() => void regenerate()}>{busy === 'regenerate' ? '正在生成…' : '确认生成'}</button></div> : <button type="button" className="button" disabled={busy !== null} onClick={() => setConfirmRegenerate(true)}><RefreshCw size={14} />重新生成</button>}
      </div>
      <div className="git-danger-row">
