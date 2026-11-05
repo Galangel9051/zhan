@@ -106,6 +106,7 @@ func (s *Server) Router() *gin.Engine {
 	})
 	api.GET("/filesystem", s.browseFilesystem)
 	api.GET("/git/branches", s.inspectGitBranches)
+	api.GET("/containers/stats", s.containerStats)
 	api.GET("/stacks", s.stacks)
 	api.GET("/stacks/discover", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)

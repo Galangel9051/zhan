@@ -32,6 +32,8 @@
 - 服务器目录/文件选择器，支持隐藏目录、粘贴路径、多文件按序绑定
 - 填写项目目录后自动识别 Git 分支，通过下拉框选择，默认绑定当前分支
 - Stack / Service / Container 三级状态，逐个启停重启
+- CPU、内存、网络和磁盘 I/O 实时采样，支持项目与服务合计
+- 自定义表头：显示/隐藏列、调整顺序、拖拽列宽并保存浏览器偏好
 - 只读导入：校验路径与配置，不改动你的项目
 
 **Git 与部署**
@@ -210,6 +212,7 @@ ZHAN_DOCKER_INTEGRATION=1 go test -v ./internal/deploy -run TestRealDockerLifecy
 
 ## 文档
 
+- [容器资源与自定义列](docs/container-resources.md)
 - [配置导入与导出](docs/configuration-backup.md)
 - [安装与 systemd](docs/install.md)
 - [Docker 部署](docs/docker.md)
