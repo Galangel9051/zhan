@@ -48,16 +48,14 @@ Mac Docker Desktop 需要允许共享相应宿主机文件夹；Linux rootless D
 
 ## Git 与 SSH
 
-Git HTTPS 凭据、SSH 身份不会自动从宿主机带入。需要通过 SSH 更新的项目可在 `compose.override.yaml` 为 app 挂载专用部署私钥与已验证的 known_hosts，例如：
+栈长首次启动会在持久化的数据目录 `<data_dir>/ssh/` 自动生成一把专用 Ed25519 密钥，所有 Git 操作都使用它。公钥在 **设置 → Git 凭据** 中复制，添加到 Git 平台的 Deploy Key / SSH Keys 后点 **测试连接**。私钥不会通过 HTTP 接口返回，也不需要从宿主机带入或挂载。
 
-```yaml
-services:
-  app:
-    volumes:
-      - /opt/zhan-ssh:/root/.ssh:ro
-```
+- 数据目录必须持久化（`ZHAN_HOST_DATA_DIR`），否则重建容器后密钥会变化。
+- 如需复用已有密钥，替换 `<data_dir>/ssh/id_ed25519` 和 `.pub`，保持目录 `0700`、私钥 `0600`，并确保运行用户可读。
+- 首次连接使用 `StrictHostKeyChecking=accept-new`，主机指纹记录在 `<data_dir>/ssh/known_hosts`，可在设置页清除。
+- 每次 Git 调用只为已选中的工作目录设置 `safe.directory`，兼容容器与宿主机 UID 不同，不全局信任所有仓库。
 
-确保该目录只包含所需部署身份，配置的私钥权限正确，容器内可找到 SSH config 中引用的文件。Git 仍使用 BatchMode 和严格主机校验。每次 Git 调用只为已选中的工作目录设置 safe.directory，兼容容器与宿主机 UID 不同，不全局信任所有仓库。
+详见 [Git 凭据与 SSH 密钥](git-credentials.md)。
 
 ## 维护
 

@@ -283,10 +283,10 @@ func (e *Engine) run(ctx context.Context, t *model.Task, s *model.Stack, out io.
 	switch t.Type {
 	case "git_check":
 		stage("git_check")
-		return e.checkGit(ctx, s, out)
+		return ExplainGitError(e.checkGit(ctx, s, out))
 	case "git_pull":
 		stage("git_pull")
-		return e.pullGit(ctx, s, out)
+		return ExplainGitError(e.pullGit(ctx, s, out))
 	case "start", "stop", "restart":
 		stage(t.Type)
 		services, err := e.Docker.CheckTarget(ctx, *s, t.Service, t.Container)
@@ -344,16 +344,16 @@ func (e *Engine) run(ctx context.Context, t *model.Task, s *model.Stack, out io.
 				if t.Commit == "" {
 					t.Commit = s.Local
 				}
-				return err
+				return ExplainGitError(err)
 			}
 		} else if s.Branch != "" {
 			stage("git_check")
 			if err := e.ValidateGit(ctx, s); err != nil {
-				return err
+				return ExplainGitError(err)
 			}
 			local, err := e.git(ctx, *s, "rev-parse", "HEAD")
 			if err != nil {
-				return err
+				return ExplainGitError(err)
 			}
 			s.Local = stringsTrim(local)
 			_, _ = e.DB.Exec("UPDATE deployment_configs SET local_commit=? WHERE stack_id=?", s.Local, s.ID)

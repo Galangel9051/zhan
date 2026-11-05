@@ -39,6 +39,7 @@
 **Git 与部署**
 
 - 检查更新、仅拉取代码、拉取并部署、按当前代码重新构建
+- 首次启动自动生成专用 SSH 密钥，设置页复制公钥即可接入，无需挂载宿主机凭据
 - 拒绝脏工作区，只做 `merge --ff-only`，不执行 `reset --hard`
 - 分别记录远程、本地、最近尝试与最近成功的 Commit，失败不会误记成功
 - 按项目轮询自动部署，失败后 5/15 分钟退避重试，达到阈值暂停
@@ -94,7 +95,9 @@ cd frontend && npm ci && cd ..
 
 访问 <http://127.0.0.1:12345，使用> `admin / 123456` 登录，首次登录必须设置新密码。
 
-生产部署、SSH 凭据、备份、HTTPS 与 systemd 配置见 [安装文档](docs/install.md)。
+首次登录后打开 **设置 → Git 凭据**，复制公钥添加到 GitHub/GitLab/Gitee 的 Deploy Key，再点 **测试连接**。详细步骤和常见错误见 [Git 凭据与 SSH 密钥](docs/git-credentials.md)。
+
+生产部署、备份、HTTPS 与 systemd 配置见 [安装文档](docs/install.md)。
 
 ### 本地开发
 
@@ -214,6 +217,7 @@ ZHAN_DOCKER_INTEGRATION=1 go test -v ./internal/deploy -run TestRealDockerLifecy
 
 - [容器资源与自定义列](docs/container-resources.md)
 - [配置导入与导出](docs/configuration-backup.md)
+- [Git 凭据与 SSH 密钥](docs/git-credentials.md)
 - [安装与 systemd](docs/install.md)
 - [Docker 部署](docs/docker.md)
 - [反向代理使用说明](docs/reverse-proxy.md)

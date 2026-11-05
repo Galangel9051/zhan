@@ -41,9 +41,18 @@ sudo chown -R zhan:zhan /opt/zhan
 
 ## 3. Git 身份与 SSH
 
-以服务账户配置每个 Git 仓库的最小权限 SSH Deploy Key、SSH config 和已验证的 `known_hosts`。平台采用 BatchMode 与 StrictHostKeyChecking，不弹出认证提示，不跳过主机身份验证。
+栈长首次启动会在 `<data_dir>/ssh/` 自动生成一把专用 Ed25519 密钥，所有 Git 操作都使用它。不需要配置服务账户的 `~/.ssh`，也不需要手动把宿主机密钥挂载进容器。
 
-确保服务账户可访问 Docker 和仓库：
+首次使用：
+
+1. 启动服务并登录。
+2. 打开 **设置 → Git 凭据**。
+3. 复制公钥，添加到 GitHub/GitLab/Gitee 的仓库 Deploy Key 或账号 SSH Keys（只读即可）。
+4. 回到页面点 **测试连接**，成功后即可导入或更新仓库。
+
+详细步骤、错误解释和密钥轮换见 [Git 凭据与 SSH 密钥](git-credentials.md)。
+
+服务账户仍需能访问项目目录和 Docker：
 
 ```sh
 sudo -u zhan docker compose version
@@ -51,7 +60,7 @@ sudo -u zhan git -C /opt/projects/example status
 sudo -u zhan git -C /opt/projects/example ls-remote origin refs/heads/main
 ```
 
-界面绑定现有 `origin`，不自动克隆仓库、创建凭据、切换分支或修改 remote。不接受在 HTTP(S) 仓库地址内嵌密码或令牌；Git 自身的授权凭据助手也可由服务器管理员配置。
+界面绑定现有 `origin`，不自动克隆仓库、创建凭据、切换分支或修改 remote。不接受在 HTTP(S) 仓库地址内嵌密码或令牌。如需复用已有密钥，参考 [Git 凭据与 SSH 密钥](git-credentials.md)。
 
 ## 4. 首次登录与强制修改密码
 

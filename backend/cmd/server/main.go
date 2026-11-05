@@ -22,6 +22,7 @@ import (
 	"zhan/backend/internal/httpapi"
 	"zhan/backend/internal/notify"
 	"zhan/backend/internal/proxy"
+	"zhan/backend/internal/sshkey"
 )
 
 func main() {
@@ -80,8 +81,19 @@ func run() error {
 		}
 		return nil
 	}
+	gitKeys := sshkey.New(cfg.DataDir)
+	keyInfo, generated, err := gitKeys.Ensure()
+	if err != nil {
+		return fmt.Errorf("初始化 Git SSH 密钥失败：%w", err)
+	}
+	if generated {
+		log.Printf("已生成内置 SSH 密钥 %s；请在“设置 → Git 凭据”复制公钥并添加到 Git 平台", keyInfo.Fingerprint)
+	} else {
+		log.Printf("Git SSH 密钥：%s（%s）", keyInfo.Fingerprint, keyInfo.KeyPath)
+	}
+	runner := command.OSRunner{SSHCommand: gitKeys.Command()}
 	gin.SetMode(gin.ReleaseMode)
-	d := &docker.Client{Runner: command.OSRunner{}, Roots: cfg.AllowedRoots}
+	d := &docker.Client{Runner: runner, Roots: cfg.AllowedRoots}
 	n := &notify.Notifier{DB: db, Auth: authentication}
 	engine := deploy.New(db, d, cfg, n)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -91,12 +103,12 @@ func run() error {
 	if err = engine.Start(workerCtx); err != nil {
 		return err
 	}
-	proxyManager := proxy.New(db, authentication, command.OSRunner{}, cfg.DataDir)
+	proxyManager := proxy.New(db, authentication, runner, cfg.DataDir)
 	if err = proxyManager.Start(); err != nil {
 		return err
 	}
 	defer proxyManager.Close()
-	api := &httpapi.Server{Proxy: proxyManager, DB: db, Auth: authentication, Docker: d, Engine: engine, Notify: n, Config: cfg}
+	api := &httpapi.Server{Proxy: proxyManager, DB: db, Auth: authentication, Docker: d, Engine: engine, Notify: n, Git: gitKeys, Config: cfg}
 	server := &http.Server{Addr: cfg.Listen, Handler: api.Router(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	failure := make(chan error, 1)
 	go func() {
