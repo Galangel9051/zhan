@@ -38,3 +38,49 @@ services:
         max-size: "10m"
         max-file: "3"
     stop_grace_period: 45s
+
+  # 可选：自更新 sidecar（COMPOSE_PROFILES=self-update 或
+  # docker compose --profile self-update up -d）。它只重建 app，不重启自己。
+  updater:
+    profiles: ["self-update"]
+    image: zhan:local
+    restart: unless-stopped
+    init: true
+    depends_on:
+      app:
+        condition: service_healthy
+    working_dir: /repo
+    # Copy the script to /tmp so a git update cannot rewrite the running shell script.
+    entrypoint: ["/bin/sh", "-c", "cp /repo/scripts/self-update.sh /tmp/self-update.sh && exec /bin/sh /tmp/self-update.sh"]
+    environment:
+      ZHAN_HOST_PROJECTS_ROOT: ${ZHAN_HOST_PROJECTS_ROOT}
+      ZHAN_HOST_DATA_DIR: ${ZHAN_HOST_DATA_DIR}
+      ZHAN_HOST_REPO: ${ZHAN_HOST_REPO:?Run scripts/docker-up.sh or set ZHAN_HOST_REPO}
+      ZHAN_BIND_IP: ${ZHAN_BIND_IP:-127.0.0.1}
+      ZHAN_PORT: ${ZHAN_PORT:-12345}
+      ZHAN_SELF_UPDATE_INTERVAL: ${ZHAN_SELF_UPDATE_INTERVAL:-300}
+      GIT_SSH_COMMAND: "ssh -i /ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/ssh/known_hosts"
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - type: bind
+        source: ${ZHAN_DOCKER_SOCKET:-/var/run/docker.sock}
+        target: /var/run/docker.sock
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ZHAN_HOST_REPO:?Run scripts/docker-up.sh or set ZHAN_HOST_REPO}
+        target: /repo
+        bind:
+          create_host_path: false
+      # 与 app 共用内置 SSH 身份；known_hosts 需要可写，首次连接才能记录指纹
+      - type: bind
+        source: ${ZHAN_HOST_DATA_DIR}/ssh
+        target: /ssh
+        bind:
+          create_host_path: false
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    stop_grace_period: 30s

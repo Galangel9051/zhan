@@ -15,6 +15,7 @@ fi
 mkdir -p "$data_root"
 export ZHAN_HOST_PROJECTS_ROOT="$(cd "$projects_root" && pwd -P)"
 export ZHAN_HOST_DATA_DIR="$(cd "$data_root" && pwd -P)"
+export ZHAN_HOST_REPO="$project_root"
 if [ "$#" -eq 0 ]; then
   set -- up -d --build --wait
 fi

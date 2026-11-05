@@ -57,6 +57,35 @@ Mac Docker Desktop 需要允许共享相应宿主机文件夹；Linux rootless D
 
 详见 [Git 凭据与 SSH 密钥](git-credentials.md)。
 
+## 自更新（可选）
+
+`compose.yaml` 提供一个独立的 `updater` sidecar（profile `self-update`），让 Zhan 管理自己的更新。它每 `ZHAN_SELF_UPDATE_INTERVAL` 秒检查一次 `origin/main`：
+
+- 工作区必须干净，否则跳过本轮
+- 有新提交时执行 `git merge --ff-only`，然后只重建/重启 `app`
+- 构建或健康检查失败会把源码回退到旧提交，app 继续使用旧镜像
+- updater 不在 `up` 的目标服务里，不会被 app 重启杀掉
+
+启用方式（任选其一）：
+
+```sh
+COMPOSE_PROFILES=self-update ./scripts/docker-up.sh
+# 或
+docker compose --profile self-update up -d
+```
+
+也可以把 `COMPOSE_PROFILES=self-update` 写入仓库根目录的 `.env`，之后 `docker compose` 和 `scripts/docker-up.sh` 会自动启用。查看日志：
+
+```sh
+docker compose --profile self-update logs -f updater
+```
+
+说明：
+
+- updater 使用与 app 相同的内置 SSH key（挂载 `<data_dir>/ssh`）和仓库的 `origin`。请确保 `origin` 对该 key 可访问，或使用公开的 HTTPS 地址。
+- sidecar 拥有 Docker socket 和数据目录中的 SSH key，权限较高；只在可信环境启用。
+- 不需要自动更新时，移除 profile，或执行 `docker compose --profile self-update stop updater`。
+
 ## 维护
 
 ```sh
