@@ -30,7 +30,10 @@
 
 - 自动发现宿主机上的 Compose 项目，也可手动指定目录或 compose 文件
 - 服务器目录/文件选择器，支持隐藏目录、粘贴路径、多文件按序绑定
+- 填写项目目录后自动识别 Git 分支，通过下拉框选择，默认绑定当前分支
 - Stack / Service / Container 三级状态，逐个启停重启
+- CPU、内存、网络和磁盘 I/O 实时采样，支持项目与服务合计
+- 自定义表头：显示/隐藏列、调整顺序、拖拽列宽并保存浏览器偏好
 - 只读导入：校验路径与配置，不改动你的项目
 
 **Git 与部署**
@@ -103,7 +106,7 @@ make dev-backend
 cd frontend && npm run dev
 ```
 
-前端访问 <http://127.0.0.1:5173，Vite> 代理 `/api` 到 `127.0.0.1:12345`。开发启动固定使用仓库根目录的 `data/`，可通过 `ZHAN_DATA_DIR` 指定其他目录，例如 `ZHAN_DATA_DIR="$PWD/data-dev" make dev-backend`。同一数据目录同时只能运行一个实例。
+前端访问 <http://127.0.0.1:5173，Vite> 代理 `/api` 到 `127.0.0.1:12345`。开发启动、`go run`、仓库内的 `bin/zhan` 和 Docker 启动脚本统一使用仓库根目录的 `data/`，不受当前工作目录影响。独立安装的二进制使用安装目录的 `data/`（位于 `bin/` 时使用上一级目录）。可通过 `ZHAN_DATA_DIR` 统一指定其他目录，建议使用绝对路径，例如 `ZHAN_DATA_DIR="$PWD/data-dev" make dev-backend`。同一数据目录同时只能运行一个实例，启动日志会显示实际数据目录。
 
 ### Docker
 
@@ -121,7 +124,7 @@ cd frontend && npm run dev
 | 配置项                    | 环境变量                 | 默认值               | 说明                       |
 | ---------------------- | -------------------- | ----------------- | ------------------------ |
 | `listen`               | `ZHAN_LISTEN`        | `127.0.0.1:12345` | 监听地址                     |
-| `data_dir`             | `ZHAN_DATA_DIR`      | `data`            | 数据目录，含 `zhan.db`、日志与代理配置 |
+| `data_dir`             | `ZHAN_DATA_DIR`      | 固定目录下的 `data/` | 数据库、密钥、日志与代理配置；相对路径以仓库或安装目录为基准 |
 | `allowed_roots`        | `ZHAN_ALLOWED_ROOTS` | 空                 | 限定可访问的服务器目录，留空表示不限       |
 | `secure_cookies`       | —                    | `false`           | 通过 HTTPS 访问时设为 `true`    |
 | `session_hours`        | —                    | `12`              | 会话有效期                    |
@@ -153,6 +156,8 @@ Git 绑定使用现有的 `origin` 与当前分支。推荐为服务账户配置
 ## HTTP API
 
 统一前缀 `/api/v1`。登录后取得 `csrf_token`，写请求需带 `X-CSRF-Token` 与会话 Cookie。
+
+部署历史支持 `GET /tasks?page=1&page_size=50&status=all`，返回 `data` 和 `pagination`（当前页、每页条数、总条数、总页数）。状态筛选覆盖全部任务。页码超出范围时返回最后一页；空结果返回第 1 页。原有 `limit` / `before` 游标接口仍可使用，不能与 `page` 混用。
 
 | 分组   | 端点                                                                                                    |
 | ---- | ----------------------------------------------------------------------------------------------------- |
@@ -207,6 +212,8 @@ ZHAN_DOCKER_INTEGRATION=1 go test -v ./internal/deploy -run TestRealDockerLifecy
 
 ## 文档
 
+- [容器资源与自定义列](docs/container-resources.md)
+- [配置导入与导出](docs/configuration-backup.md)
 - [安装与 systemd](docs/install.md)
 - [Docker 部署](docs/docker.md)
 - [反向代理使用说明](docs/reverse-proxy.md)

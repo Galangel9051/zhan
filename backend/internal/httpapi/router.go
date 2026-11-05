@@ -59,7 +59,11 @@ func (s *Server) Router() *gin.Engine {
 		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			c.Header("Cache-Control", "no-store")
-			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
+			limit := int64(64 * 1024)
+			if c.Request.URL.Path == "/api/v1/settings/config/import" || c.Request.URL.Path == "/api/v1/settings/config/import/preview" {
+				limit = maxConfigurationBytes
+			}
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 		}
 		if c.Request.Method != "GET" && c.Request.Method != "HEAD" {
 			if origin := c.GetHeader("Origin"); origin != "" {
@@ -101,6 +105,8 @@ func (s *Server) Router() *gin.Engine {
 		c.Status(204)
 	})
 	api.GET("/filesystem", s.browseFilesystem)
+	api.GET("/git/branches", s.inspectGitBranches)
+	api.GET("/containers/stats", s.containerStats)
 	api.GET("/stacks", s.stacks)
 	api.GET("/stacks/discover", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
@@ -141,6 +147,10 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/stacks/:id/containers/:container/logs", s.containerLogs)
 	api.GET("/stacks/:id/services/:name/logs", s.containerLogs)
 	api.GET("/tasks", func(c *gin.Context) {
+		if c.Request.URL.Query().Has("page") {
+			s.pagedTasks(c)
+			return
+		}
 		stack, _ := strconv.ParseInt(c.Query("stack_id"), 10, 64)
 		before, _ := strconv.ParseInt(c.Query("before"), 10, 64)
 		items, err := s.DB.Tasks(stack, before, bounded(c.Query("limit"), 50, 1, 200))
@@ -181,6 +191,9 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/tasks/:id/logs", s.logs)
 	api.GET("/tasks/:id/stream", s.stream)
 	api.GET("/settings", s.settings)
+	api.GET("/settings/config/export", s.exportConfiguration)
+	api.POST("/settings/config/import/preview", s.previewConfiguration)
+	api.POST("/settings/config/import", s.importConfiguration)
 	api.PUT("/settings", s.updateSettings)
 	api.PUT("/settings/smtp", func(c *gin.Context) {
 		var input model.SMTP

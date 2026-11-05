@@ -1,8 +1,6 @@
 package docker
 
 import (
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/model"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/model"
 )
 
 var projectName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,127}$`)
@@ -30,6 +30,11 @@ type Client struct {
 	cacheErr error
 	cfgMu    sync.Mutex
 	configs  map[string]configEntry
+	statsMu  sync.Mutex
+	statsAt  time.Time
+	statsKey string
+	statsErr error
+	stats    StatsSnapshot
 }
 
 type configEntry struct {
@@ -237,9 +242,12 @@ func (c *Client) Containers(ctx context.Context) ([]model.Container, error) {
 			Labels map[string]string
 		}
 		State struct {
-			Status string
-			Health *struct{ Status string }
+			Status    string
+			StartedAt string
+			Health    *struct{ Status string }
 		}
+		Created         string
+		RestartCount    int
 		NetworkSettings struct {
 			Ports map[string][]struct {
 				HostIP   string
@@ -263,7 +271,7 @@ func (c *Client) Containers(ctx context.Context) ([]model.Container, error) {
 		if r.State.Health != nil {
 			health = r.State.Health.Status
 		}
-		items = append(items, model.Container{ID: r.ID, Name: strings.TrimPrefix(r.Name, "/"), Service: r.Config.Labels["com.docker.compose.service"], State: r.State.Status, Health: health, Image: r.Config.Image, Ports: strings.Join(ports, ", "), Project: r.Config.Labels["com.docker.compose.project"]})
+		items = append(items, model.Container{ID: r.ID, Name: strings.TrimPrefix(r.Name, "/"), Service: r.Config.Labels["com.docker.compose.service"], State: r.State.Status, Health: health, Image: r.Config.Image, Ports: strings.Join(ports, ", "), Project: r.Config.Labels["com.docker.compose.project"], CreatedAt: r.Created, StartedAt: r.State.StartedAt, RestartCount: r.RestartCount})
 	}
 	c.cached = items
 	c.cacheErr = nil

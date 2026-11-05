@@ -39,14 +39,17 @@ type Service struct {
 	Containers   []Container `json:"containers"`
 }
 type Container struct {
-	Project string `json:"-"`
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Service string `json:"service"`
-	State   string `json:"state"`
-	Health  string `json:"health"`
-	Image   string `json:"image"`
-	Ports   string `json:"ports"`
+	Project      string `json:"-"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Service      string `json:"service"`
+	State        string `json:"state"`
+	Health       string `json:"health"`
+	Image        string `json:"image"`
+	Ports        string `json:"ports"`
+	CreatedAt    string `json:"created_at"`
+	StartedAt    string `json:"started_at"`
+	RestartCount int    `json:"restart_count"`
 }
 type Discovery struct {
 	Name   string   `json:"name"`

@@ -4,6 +4,10 @@
   try { preference = localStorage.getItem('zhan-theme') } catch { /* storage can be unavailable */ }
   const dark = preference === 'dark' || (preference !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+  document.querySelectorAll('link[data-theme-icon]').forEach(icon => {
+    const href = icon.getAttribute(dark ? 'data-dark-href' : 'data-light-href')
+    if (href) icon.setAttribute('href', href)
+  })
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.content = dark ? '#101827' : '#f6f8fb'
+  if (meta) meta.content = dark ? '#212121' : '#ffffff'
 })()

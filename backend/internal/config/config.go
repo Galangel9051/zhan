@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -24,7 +25,7 @@ type Config struct {
 }
 
 func Load(path string) (Config, error) {
-	c := Config{Listen: "127.0.0.1:12345", DataDir: "data", AllowedRoots: []string{}, SessionHours: 12, Workers: 1, TaskTimeoutMinutes: 30, LogRetentionDays: 30, MaxLogMB: 20, RetryDelays: []int{300, 900}}
+	c := Config{Listen: "127.0.0.1:12345", AllowedRoots: []string{}, SessionHours: 12, Workers: 1, TaskTimeoutMinutes: 30, LogRetentionDays: 30, MaxLogMB: 20, RetryDelays: []int{300, 900}}
 	if path != "" {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -42,6 +43,9 @@ func Load(path string) (Config, error) {
 	if v := os.Getenv("ZHAN_DATA_DIR"); v != "" {
 		c.DataDir = v
 	}
+	if v := os.Getenv("ZHAN_HOST_DATA_DIR"); v != "" {
+		c.DataDir = v
+	}
 	if v := os.Getenv("ZHAN_ALLOWED_ROOTS"); v != "" {
 		c.AllowedRoots = filepath.SplitList(v)
 	}
@@ -55,9 +59,26 @@ func Load(path string) (Config, error) {
 		return c, fmt.Errorf("invalid worker, timeout or retention settings")
 	}
 	var err error
+	base, err := dataBaseDir()
+	if err != nil {
+		return c, err
+	}
+	if c.DataDir == "" {
+		c.DataDir = filepath.Join(base, "data")
+	} else if !filepath.IsAbs(c.DataDir) {
+		c.DataDir = filepath.Join(base, c.DataDir)
+	}
 	c.DataDir, err = filepath.Abs(c.DataDir)
 	if err != nil {
 		return c, err
+	}
+	if v := os.Getenv("ZHAN_DATA_DIR"); v != "" && os.Getenv("ZHAN_HOST_DATA_DIR") != "" {
+		if !filepath.IsAbs(v) {
+			v = filepath.Join(base, v)
+		}
+		if filepath.Clean(v) != c.DataDir {
+			return c, fmt.Errorf("ZHAN_HOST_DATA_DIR 与 ZHAN_DATA_DIR 必须指向同一目录")
+		}
 	}
 	for i, root := range c.AllowedRoots {
 		root, err = filepath.EvalSymlinks(root)
@@ -75,4 +96,34 @@ func Load(path string) (Config, error) {
 		}
 	}
 	return c, nil
+}
+
+// Source runs use the repository; released binaries use their installation
+// directory (or its parent when installed in bin/). Neither depends on cwd.
+func dataBaseDir() (string, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	executable, err = filepath.EvalSymlinks(executable)
+	if err != nil {
+		return "", err
+	}
+	_, source, _, _ := runtime.Caller(0)
+	return resolveDataBase(executable, source), nil
+}
+
+func resolveDataBase(executable, source string) string {
+	// With -trimpath the source path is relative and must never resolve via cwd.
+	if filepath.IsAbs(source) {
+		root := filepath.Clean(filepath.Join(filepath.Dir(source), "../../.."))
+		if _, err := os.Stat(filepath.Join(root, "backend", "go.mod")); err == nil {
+			return root
+		}
+	}
+	base := filepath.Dir(executable)
+	if filepath.Base(base) == "bin" {
+		base = filepath.Dir(base)
+	}
+	return base
 }

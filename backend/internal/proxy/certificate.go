@@ -32,8 +32,8 @@ func (m *Manager) validateIssue(h Host, s Settings) error {
 	if h.Domain != s.DuckDomain && !strings.HasSuffix(h.Domain, "."+s.DuckDomain) {
 		return fmt.Errorf("自动证书仅支持 %s 及其子域名", s.DuckDomain)
 	}
-	if !s.AgreeTerms || s.Email == "" {
-		return errors.New("请先填写证书联系邮箱并同意 Let's Encrypt 服务条款")
+	if !s.AgreeTerms {
+		return errors.New("请先同意 Let's Encrypt 服务条款")
 	}
 	return nil
 }
@@ -148,7 +148,11 @@ func (m *Manager) issue(ctx context.Context, h Host, s Settings) error {
 		transport = &http.Client{Timeout: 30 * time.Second}
 	}
 	client := &acme.Client{Key: key, DirectoryURL: directory, HTTPClient: transport, UserAgent: "Zhan/1.0"}
-	_, err = client.Register(ctx, &acme.Account{Contact: []string{"mailto:" + s.Email}}, acme.AcceptTOS)
+	account := &acme.Account{}
+	if s.Email != "" {
+		account.Contact = []string{"mailto:" + s.Email}
+	}
+	_, err = client.Register(ctx, account, acme.AcceptTOS)
 	if err != nil {
 		return fmt.Errorf("注册证书账户失败：%w", err)
 	}

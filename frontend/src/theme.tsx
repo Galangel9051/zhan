@@ -9,7 +9,11 @@ const ThemeContext = createContext<{ theme: Theme; switching: boolean; toggle: (
 function savedTheme() { try { return localStorage.getItem(storageKey) } catch { return null } }
 function apply(theme: Theme) {
  document.documentElement.dataset.theme = theme
- document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#101827' : '#f6f8fb')
+ document.querySelectorAll('link[data-theme-icon]').forEach(icon => {
+  const href = icon.getAttribute(`data-${theme}-href`)
+  if (href) icon.setAttribute('href', href)
+ })
+ document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#212121' : '#ffffff')
 }
 export function ThemeProvider({ children }: { children: ReactNode }) {
  const [theme, setTheme] = useState<Theme>(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
@@ -50,4 +54,10 @@ export function ThemeToggle() {
   context!.toggle(origin)
  }
  return <button type="button" className="theme-toggle" onClick={click} disabled={context.switching} aria-busy={context.switching} aria-label={label} title={label} aria-pressed={dark}>{dark ? <Sun size={16} /> : <Moon size={16} />}<span>{dark ? '明亮模式' : '夜间模式'}</span></button>
+}
+
+export function BrandLogo({ alt = '' }: { alt?: string }) {
+ const context = useContext(ThemeContext)
+ if (!context) throw new Error('BrandLogo requires ThemeProvider')
+ return <img src={context.theme === 'dark' ? '/logo-dark-192.png' : '/logo-192.png'} alt={alt} aria-hidden={alt ? undefined : true} draggable={false} />
 }

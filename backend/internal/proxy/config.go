@@ -49,7 +49,7 @@ var domainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:
 var idPattern = regexp.MustCompile(`^[a-f0-9]{16}$`)
 
 func Defaults() Config {
-	return Config{Settings: Settings{Bind: "127.0.0.1", HTTPPort: 8088, HTTPSPort: 8443}, Hosts: []Host{}}
+	return Config{Settings: Settings{Bind: "0.0.0.0", HTTPPort: 80, HTTPSPort: 443}, Hosts: []Host{}}
 }
 func Normalize(c *Config) error {
 	s := &c.Settings

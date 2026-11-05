@@ -1,10 +1,6 @@
 package notify
 
 import (
-	"zhan/backend/internal/auth"
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/database"
-	"zhan/backend/internal/model"
 	"crypto/tls"
 	"database/sql"
 	"errors"
@@ -15,6 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/model"
 )
 
 type Notifier struct {
@@ -60,6 +60,10 @@ func validateSMTP(s model.SMTP) error {
 	}
 	return nil
 }
+
+// Validate checks configuration without saving credentials or sending mail.
+func Validate(s model.SMTP) error { return validateSMTP(s) }
+
 func (n *Notifier) Save(s model.SMTP) error {
 	if err := validateSMTP(s); err != nil {
 		return err
