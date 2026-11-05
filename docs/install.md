@@ -12,7 +12,7 @@ nvm use
 ./scripts/build.sh
 ```
 
-结果为 `bin/zhan`，包含前端静态文件，SQLite 驱动为纯 Go。Linux 上原生构建即可；macOS 交叉编译 Linux 示例：
+结果为 `bin/zhan`，包含前端静态文件，SQLite 驱动为纯 Go。数据默认固定在仓库的 `data/`；复制到 `/opt/zhan/zhan` 后默认固定在 `/opt/zhan/data/`，从其他目录启动也不会另建一份。Linux 上原生构建即可；macOS 交叉编译 Linux 示例：
 
 ```sh
 # 先完成 ./scripts/build.sh，再选择目标架构。

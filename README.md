@@ -103,7 +103,7 @@ make dev-backend
 cd frontend && npm run dev
 ```
 
-前端访问 <http://127.0.0.1:5173，Vite> 代理 `/api` 到 `127.0.0.1:12345`。开发启动固定使用仓库根目录的 `data/`，可通过 `ZHAN_DATA_DIR` 指定其他目录，例如 `ZHAN_DATA_DIR="$PWD/data-dev" make dev-backend`。同一数据目录同时只能运行一个实例。
+前端访问 <http://127.0.0.1:5173，Vite> 代理 `/api` 到 `127.0.0.1:12345`。开发启动、`go run`、仓库内的 `bin/zhan` 和 Docker 启动脚本统一使用仓库根目录的 `data/`，不受当前工作目录影响。独立安装的二进制使用安装目录的 `data/`（位于 `bin/` 时使用上一级目录）。可通过 `ZHAN_DATA_DIR` 统一指定其他目录，建议使用绝对路径，例如 `ZHAN_DATA_DIR="$PWD/data-dev" make dev-backend`。同一数据目录同时只能运行一个实例，启动日志会显示实际数据目录。
 
 ### Docker
 
@@ -121,7 +121,7 @@ cd frontend && npm run dev
 | 配置项                    | 环境变量                 | 默认值               | 说明                       |
 | ---------------------- | -------------------- | ----------------- | ------------------------ |
 | `listen`               | `ZHAN_LISTEN`        | `127.0.0.1:12345` | 监听地址                     |
-| `data_dir`             | `ZHAN_DATA_DIR`      | `data`            | 数据目录，含 `zhan.db`、日志与代理配置 |
+| `data_dir`             | `ZHAN_DATA_DIR`      | 固定目录下的 `data/` | 数据库、密钥、日志与代理配置；相对路径以仓库或安装目录为基准 |
 | `allowed_roots`        | `ZHAN_ALLOWED_ROOTS` | 空                 | 限定可访问的服务器目录，留空表示不限       |
 | `secure_cookies`       | —                    | `false`           | 通过 HTTPS 访问时设为 `true`    |
 | `session_hours`        | —                    | `12`              | 会话有效期                    |

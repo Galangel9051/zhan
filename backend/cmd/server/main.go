@@ -1,15 +1,6 @@
 package main
 
 import (
-	"zhan/backend/internal/auth"
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/config"
-	"zhan/backend/internal/database"
-	"zhan/backend/internal/deploy"
-	"zhan/backend/internal/docker"
-	"zhan/backend/internal/httpapi"
-	"zhan/backend/internal/notify"
-	"zhan/backend/internal/proxy"
 	"context"
 	"errors"
 	"flag"
@@ -22,6 +13,15 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/deploy"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/httpapi"
+	"zhan/backend/internal/notify"
+	"zhan/backend/internal/proxy"
 )
 
 func main() {
@@ -41,6 +41,7 @@ func run() error {
 	if err = os.MkdirAll(cfg.DataDir, 0700); err != nil {
 		return err
 	}
+	log.Printf("数据目录：%s", cfg.DataDir)
 	db, err := database.Open(filepath.Join(cfg.DataDir, "zhan.db"))
 	if err != nil {
 		return err

@@ -18,11 +18,11 @@
 ```sh
 # 在运行本命令的 shell 中设置；后续管理命令保持相同设置。
 export ZHAN_HOST_PROJECTS_ROOT=/opt/projects
-export ZHAN_HOST_DATA_DIR=/opt/zhan/data
+export ZHAN_DATA_DIR=/opt/zhan/data
 ./scripts/docker-up.sh
 ```
 
-路径不必在本仓库内，但目录需要存在并可由 Docker 访问。脚本创建数据目录，并解析路径的符号链接。直接运行 `docker compose` 时，需要自行设置上述两个绝对路径变量；推荐使用脚本自动处理。
+路径不必在本仓库内，但目录需要存在并可由 Docker 访问。脚本创建数据目录，并解析路径的符号链接。`ZHAN_DATA_DIR` 与本地运行共用；兼容旧变量 `ZHAN_HOST_DATA_DIR`，同时设置时必须一致，否则拒绝启动。直接运行 `docker compose` 时，需要自行设置 `ZHAN_HOST_PROJECTS_ROOT` 和 `ZHAN_HOST_DATA_DIR` 两个绝对路径变量；推荐使用脚本自动处理。
 
 ## 如何管理宿主机的容器与挂载
 

@@ -1,6 +1,4 @@
-# Resolve data before changing into backend; allow explicit overrides.
 PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-ZHAN_DATA_DIR ?= $(PROJECT_ROOT)/data
 
 .PHONY: build check dev-backend dev-frontend
 build:
@@ -8,7 +6,7 @@ build:
 check:
 	./scripts/check.sh
 dev-backend:
-	cd "$(PROJECT_ROOT)/backend" && ZHAN_DATA_DIR="$(abspath $(ZHAN_DATA_DIR))" go run ./cmd/server
+	cd "$(PROJECT_ROOT)/backend" && go run ./cmd/server
 dev-frontend:
 	cd frontend && npm run dev
 
