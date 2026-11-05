@@ -22,12 +22,23 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 func TestDNS01IssuanceAndEncryptedAccount(t *testing.T) {
+	for _, email := range []string{"", "test@example.org"} {
+		name := "without_email"
+		if email != "" {
+			name = "with_email"
+		}
+		t.Run(name, func(t *testing.T) { testDNS01Issuance(t, email) })
+	}
+}
+
+func testDNS01Issuance(t *testing.T, email string) {
+	t.Helper()
 	m := setup(t, &fakeRunner{})
 	c := fixture()
 	c.Hosts[0].HTTPS = true
 	c.Settings.DuckDomain = "home.duckdns.org"
 	c.Settings.DuckToken = "test-token"
-	c.Settings.Email = "test@example.org"
+	c.Settings.Email = email
 	c.Settings.AgreeTerms = true
 	c, e := m.Save(c)
 	if e != nil {
@@ -68,6 +79,25 @@ func TestDNS01IssuanceAndEncryptedAccount(t *testing.T) {
 		case "/nonce":
 			body = map[string]any{}
 		case "/account":
+			var envelope struct{ Payload string }
+			if err := json.NewDecoder(r.Body).Decode(&envelope); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := base64.RawURLEncoding.DecodeString(envelope.Payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var registration struct{ Contact []string }
+			if err := json.Unmarshal(raw, &registration); err != nil {
+				t.Fatal(err)
+			}
+			if email == "" {
+				if len(registration.Contact) != 0 {
+					t.Fatal("empty email must not send a mailto contact")
+				}
+			} else if len(registration.Contact) != 1 || registration.Contact[0] != "mailto:"+email {
+				t.Fatal("provided email not registered correctly")
+			}
 			code = 201
 			header.Set("Location", "https://acme.test/acct/1")
 			body = map[string]any{"status": "valid"}
@@ -132,5 +162,27 @@ func TestDNS01IssuanceAndEncryptedAccount(t *testing.T) {
 	}
 	if _, e = m.certificate(c.Hosts[0], c.Settings); e != nil {
 		t.Fatal(e)
+	}
+}
+
+func TestCertificateEmailOptionalValidation(t *testing.T) {
+	c := fixture()
+	c.Settings.DuckDomain = "home.duckdns.org"
+	c.Settings.DuckToken = "test-token"
+	c.Settings.AgreeTerms = true
+	m := &Manager{}
+	if err := Normalize(&c); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.validateIssue(c.Hosts[0], c.Settings); err != nil {
+		t.Fatalf("empty email rejected: %v", err)
+	}
+	c.Settings.AgreeTerms = false
+	if err := m.validateIssue(c.Hosts[0], c.Settings); err == nil {
+		t.Fatal("terms acceptance must still be required")
+	}
+	c.Settings.Email = "invalid-email"
+	if err := Normalize(&c); err == nil {
+		t.Fatal("invalid nonempty email accepted")
 	}
 }
