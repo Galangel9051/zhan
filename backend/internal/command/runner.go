@@ -69,8 +69,7 @@ func (r OSRunner) Run(ctx context.Context, dir, name string, args []string, out 
 		_, _ = out.Write(stderr.Data)
 	}
 	code := -1
-	var exit *exec.ExitError
-	if errors.As(err, &exit) {
+	if exit, ok := errors.AsType[*exec.ExitError](err); ok {
 		code = exit.ExitCode()
 	}
 	return &Error{code, err}
@@ -107,6 +106,7 @@ func Capture(ctx context.Context, r Runner, dir, name string, args ...string) (s
 
 var secretURL = regexp.MustCompile(`(?i)(https?://)[^\s/@]+(?::[^\s/@]*)?@`)
 var secretKV = regexp.MustCompile(`(?i)((?:password|passwd|token|secret|authorization|api[_-]?key)["']?\s*[:=]\s*["']?)[^\s"']+`)
+var privateKeyPEM = regexp.MustCompile(`(?s)-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----.*?(?:-----END (?:[A-Z0-9]+ )*PRIVATE KEY-----|$)`)
 var bearer = regexp.MustCompile(`(?i)Bearer\s+[A-Za-z0-9._~+/=-]+`)
 
 func withoutEnv(env []string, keys ...string) []string {
@@ -131,6 +131,7 @@ func withoutEnv(env []string, keys ...string) []string {
 }
 
 func Redact(s string) string {
+	s = privateKeyPEM.ReplaceAllString(s, "[PRIVATE KEY REDACTED]")
 	s = secretURL.ReplaceAllString(s, "${1}[REDACTED]@")
 	s = secretKV.ReplaceAllString(s, "${1}[REDACTED]")
 	return bearer.ReplaceAllString(s, "Bearer [REDACTED]")

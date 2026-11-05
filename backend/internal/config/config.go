@@ -2,13 +2,14 @@ package config
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {

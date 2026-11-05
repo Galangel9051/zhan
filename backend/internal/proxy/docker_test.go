@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"zhan/backend/internal/command"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -21,6 +20,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"zhan/backend/internal/command"
 )
 
 func freePort(t *testing.T) int {

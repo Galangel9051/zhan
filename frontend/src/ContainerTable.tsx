@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, Boxes, ChevronRight, Container as ContainerIcon, RotateCcw, Settings2 } from 'lucide-react'
 import { Badge } from './App'
-import { date, short, type Container, type Service, type Stack } from './api'
+import { date, short, type Container, type Stack } from './api'
 import RuntimeActions from './RuntimeActions'
 import { useContainerStats } from './ResourceMetrics'
 import { aggregateResources, formatBytes, formatCPU } from './resource-utils'
 import { columnDefinitions, columnStorageKey, defaultColumns, normalizeColumns, type ColumnKey, type ColumnPreference } from './container-columns'
 
 type Props = { stacks: Stack[]; open: (id: number) => void; action: (stack: Stack, kind: string, service?: string, container?: string) => void }
-type TreeRow = { key: string; level: number; kind: 'project' | 'service' | 'container'; stack: Stack; service?: Service; container?: Container; containers: Container[] }
+type TreeRow = { key: string; level: number; kind: 'project' | 'container'; stack: Stack; container?: Container; containers: Container[] }
 
 function readColumns() {
  try { const saved = JSON.parse(localStorage.getItem(columnStorageKey) ?? 'null'); return normalizeColumns(saved?.version === 1 ? saved.columns : null) } catch { return defaultColumns() }
@@ -47,26 +47,23 @@ export default function ContainerTable({ stacks, open, action }: Props) {
  const rows: TreeRow[] = []
  for (const stack of stacks) {
   const key = `project:${stack.id}`
-  rows.push({ key, level: 0, kind: 'project', stack, containers: stack.services.flatMap(service => service.containers) })
+  const containers = stack.services.flatMap(service => service.containers)
+  rows.push({ key, level: 0, kind: 'project', stack, containers })
   if (!expanded.has(key)) continue
-  for (const service of stack.services) {
-   const serviceKey = `service:${stack.id}:${service.name}`
-   rows.push({ key: serviceKey, level: 1, kind: 'service', stack, service, containers: service.containers })
-   if (expanded.has(serviceKey)) for (const container of service.containers) rows.push({ key: `container:${container.id}`, level: 2, kind: 'container', stack, service, container, containers: [container] })
-  }
+  for (const container of containers) rows.push({ key: `container:${stack.id}:${container.id}`, level: 1, kind: 'container', stack, container, containers: [container] })
  }
  function cell(row: TreeRow, key: ColumnKey): ReactNode {
   const metrics = aggregateResources(row.containers, snapshot)
-  const name = row.container?.name ?? row.service?.name ?? row.stack.name
-  const status = row.container?.state ?? row.service?.status ?? row.stack.runtime_status
+  const name = row.container?.name ?? row.stack.name
+  const status = row.container?.state ?? row.stack.runtime_status
   const metricTitle = metrics?.partial ? `仅采样到 ${metrics.count} / ${metrics.active} 个运行容器，显示已采样合计` : '来自 Docker 实时采样'
   switch (key) {
    case 'name': {
-    const children = row.kind === 'project' ? row.stack.services.length : row.kind === 'service' ? row.containers.length : 0
+    const children = row.containers.length
     return <div className="container-tree-name" style={{ paddingLeft: row.level * 18 }}>
      {row.kind !== 'container' ? <button type="button" className="icon-button tree-expander" aria-label={`${expanded.has(row.key) ? '收起' : '展开'} ${name}`} aria-expanded={expanded.has(row.key)} disabled={!children} onClick={() => toggle(row.key)}><ChevronRight size={14} className={`expand-chevron ${expanded.has(row.key) ? 'is-open' : ''}`} /></button> : <span className="tree-expander-space" />}
      {row.kind === 'project' ? <Boxes size={19} /> : <ContainerIcon size={16} />}
-     <div className="container-tree-title">{row.kind === 'container' ? <strong title={name}>{name}</strong> : <button type="button" onClick={() => row.kind === 'project' ? open(row.stack.id) : toggle(row.key)} title={name}>{name}</button>}<small>{row.kind === 'project' ? `${row.stack.services.length} 个服务 · ${row.stack.project_name}` : row.kind === 'service' ? `${row.containers.length} 个容器` : short(row.container!.id)}</small></div>
+     <div className="container-tree-title">{row.kind === 'container' ? <strong title={name}>{name}</strong> : <button type="button" onClick={() => open(row.stack.id)} title={name}>{name}</button>}<small>{row.kind === 'project' ? `${row.containers.length} 个容器 · ${row.stack.project_name}` : short(row.container!.id)}</small></div>
     </div>
    }
    case 'status': return <div className="container-state"><Badge status={status} />{row.container?.health && row.container.health !== 'healthy' && <Badge status={row.container.health} />}{row.kind === 'project' && row.stack.desired_state === 'stopped' && <small className="subtle">自动部署已暂停</small>}{row.kind === 'project' && row.stack.runtime_error && <small className="resource-partial" title={row.stack.runtime_error}>读取状态失败</small>}</div>
@@ -76,13 +73,13 @@ export default function ContainerTable({ stacks, open, action }: Props) {
    case 'disk': return <div className="resource-value" title="容器启动以来累计磁盘读取 / 写入字节，并非磁盘空间占用"><span>{formatBytes(metrics?.block_read)} / {formatBytes(metrics?.block_write)}</span><small>读取 / 写入</small></div>
    case 'pids': return metrics?.pids ?? '—'
    case 'ports': { const ports = [...new Set(row.containers.map(container => container.ports).filter(Boolean))].join(', '); return <span className="container-cell-text" title={ports}>{ports || '—'}</span> }
-   case 'image': { const images = row.service ? row.container?.image ?? row.service.image : [...new Set(row.containers.map(container => container.image).filter(Boolean))].join(', '); return <code className="container-cell-text" title={images}>{images || '—'}</code> }
+   case 'image': { const images = row.container ? row.container.image : [...new Set(row.containers.map(container => container.image).filter(Boolean))].join(', '); return <code className="container-cell-text" title={images}>{images || '—'}</code> }
    case 'id': return row.container ? <code title={row.container.id}>{short(row.container.id)}</code> : '—'
    case 'started': return row.container?.started_at && !row.container.started_at.startsWith('0001-') ? <span title={row.container.started_at}>{date(row.container.started_at)}</span> : '—'
    case 'restarts': return row.container?.restart_count ?? '—'
    case 'git': return row.kind === 'project' ? <div className="resource-value"><span className="container-cell-text" title={row.stack.branch}>{row.stack.branch || '未绑定'}</span><small>{row.stack.polling_enabled ? `${row.stack.poll_interval}s · ${row.stack.auto_deploy ? '自动部署' : '仅检查'}` : '手动更新'}</small></div> : '—'
    case 'last_task': return row.kind === 'project' && row.stack.last_task ? <Badge status={row.stack.last_task.status} /> : '—'
-   case 'actions': return <RuntimeActions label={`${row.kind === 'project' ? '项目' : row.kind === 'service' ? '服务' : '容器'} ${name}`} status={status} onAction={kind => action(row.stack, kind, row.kind === 'service' ? row.service!.name : undefined, row.container?.id)} onDetails={row.kind === 'project' ? () => open(row.stack.id) : undefined} />
+   case 'actions': return <RuntimeActions label={`${row.kind === 'project' ? '项目' : '容器'} ${name}`} status={status} onAction={kind => action(row.stack, kind, undefined, row.container?.id)} onDetails={row.kind === 'project' ? () => open(row.stack.id) : undefined} />
   }
  }
  return <div className={`container-table-workspace ${resizing ? 'is-resizing' : ''}`}>

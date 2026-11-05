@@ -9,10 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
+
 	"zhan/backend/internal/command"
 	"zhan/backend/internal/model"
 )
@@ -158,10 +159,10 @@ func (c *Client) Config(ctx context.Context, s model.Stack) ([]model.Service, er
 		for dep := range item.Dependencies {
 			deps = append(deps, dep)
 		}
-		sort.Strings(deps)
+		slices.Sort(deps)
 		result = append(result, model.Service{Name: name, Image: item.Image, Build: item.Build != nil, Dependencies: deps, Status: "stopped", Containers: []model.Container{}})
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	slices.SortFunc(result, func(a, b model.Service) int { return strings.Compare(a.Name, b.Name) })
 	if len(result) == 0 {
 		return nil, errors.New("Compose 配置没有可管理服务")
 	}
@@ -266,7 +267,7 @@ func (c *Client) Containers(ctx context.Context) ([]model.Container, error) {
 				ports = append(ports, binding.HostIP+":"+binding.HostPort+" → "+port)
 			}
 		}
-		sort.Strings(ports)
+		slices.Sort(ports)
 		health := ""
 		if r.State.Health != nil {
 			health = r.State.Health.Status

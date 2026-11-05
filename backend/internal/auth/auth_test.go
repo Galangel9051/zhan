@@ -1,10 +1,14 @@
 package auth
 
 import (
-	"zhan/backend/internal/database"
+	"encoding/base64"
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"zhan/backend/internal/database"
 )
 
 func TestAdminSessionAndEncryption(t *testing.T) {
@@ -133,5 +137,132 @@ func TestPasswordMinimumSixCharacters(t *testing.T) {
 		if err != nil || !Verify(hash, password) {
 			t.Fatalf("six-character password rejected: %v", err)
 		}
+	}
+}
+
+func TestMasterKeyPermissionsAndLoss(t *testing.T) {
+	for _, encryptedSetting := range []string{"credential", "acme"} {
+		t.Run(encryptedSetting, func(t *testing.T) {
+			dir := t.TempDir()
+			db, err := database.Open(filepath.Join(dir, "db.sqlite"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			a, err := New(db, dir, 12)
+			if err != nil {
+				t.Fatal(err)
+			}
+			keyPath := filepath.Join(dir, "secret.key")
+			encrypted, err := a.Encrypt("existing-secret")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if encryptedSetting == "credential" {
+				_, err = db.Exec("INSERT INTO credentials(name,ciphertext) VALUES('smtp_password',?)", encrypted)
+			} else {
+				err = db.Setting("proxy_acme_account_false", encrypted)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(keyPath, 0644); err != nil {
+				t.Fatal(err)
+			}
+			again, err := New(db, dir, 12)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stat, err := os.Stat(keyPath)
+			if err != nil || stat.Mode().Perm() != 0600 {
+				t.Fatal("master key permissions not repaired")
+			}
+			if got, err := again.Decrypt(encrypted); err != nil || got != "existing-secret" {
+				t.Fatal("repair changed master key")
+			}
+			if err := os.Remove(keyPath); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := New(db, dir, 12); err == nil {
+				t.Fatal("missing master key silently regenerated")
+			}
+			if _, err := os.Stat(keyPath); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("created unusable replacement key")
+			}
+		})
+	}
+}
+
+func TestMasterKeyRejectsInvalidFiles(t *testing.T) {
+	for _, kind := range []string{"short", "oversized", "link"} {
+		t.Run(kind, func(t *testing.T) {
+			dir := t.TempDir()
+			db, err := database.Open(filepath.Join(dir, "db.sqlite"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			keyPath := filepath.Join(dir, "secret.key")
+			if kind == "link" {
+				target := filepath.Join(t.TempDir(), "key")
+				if err := os.WriteFile(target, make([]byte, 32), 0644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, keyPath); err != nil {
+					t.Fatal(err)
+				}
+				defer func() {
+					stat, err := os.Stat(target)
+					if err != nil || stat.Mode().Perm() != 0644 {
+						t.Fatal("modified symlink target")
+					}
+				}()
+			} else {
+				data := []byte("short")
+				if kind == "oversized" {
+					data = make([]byte, 64)
+				}
+				if err := os.WriteFile(keyPath, data, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := New(db, dir, 12); err == nil {
+				t.Fatal("invalid master key accepted")
+			}
+		})
+	}
+}
+
+func TestDecryptRejectsMalformedCiphertextWithoutPanicking(t *testing.T) {
+	dir := t.TempDir()
+	db, err := database.Open(filepath.Join(dir, "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	a, err := New(db, dir, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{"not-base64", "", "AAAA"} {
+		if _, err := a.Decrypt(value); err == nil {
+			t.Fatal("malformed ciphertext accepted")
+		}
+	}
+	encrypted, err := a.Encrypt("secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := base64.StdEncoding.DecodeString(encrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw[len(raw)-1] ^= 1
+	if _, err := a.Decrypt(base64.StdEncoding.EncodeToString(raw)); err == nil {
+		t.Fatal("tampered ciphertext accepted")
+	}
+	invalid := &Auth{key: []byte("bad")}
+	if _, err := invalid.Decrypt(encrypted); err == nil {
+		t.Fatal("invalid cipher key accepted")
 	}
 }

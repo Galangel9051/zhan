@@ -2,9 +2,6 @@ package notify
 
 import (
 	"bufio"
-	"zhan/backend/internal/auth"
-	"zhan/backend/internal/database"
-	"zhan/backend/internal/model"
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -14,6 +11,10 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/model"
 )
 
 func TestFailureNotificationDedupAndIndependentError(t *testing.T) {

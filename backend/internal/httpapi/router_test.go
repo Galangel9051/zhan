@@ -2,14 +2,6 @@ package httpapi
 
 import (
 	"bytes"
-	"zhan/backend/internal/auth"
-	"zhan/backend/internal/config"
-	"zhan/backend/internal/database"
-	"zhan/backend/internal/deploy"
-	"zhan/backend/internal/docker"
-	"zhan/backend/internal/model"
-	"zhan/backend/internal/notify"
-	"zhan/backend/internal/testutil"
 	"context"
 	"encoding/json"
 	"io"
@@ -22,6 +14,15 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"zhan/backend/internal/auth"
+	"zhan/backend/internal/config"
+	"zhan/backend/internal/database"
+	"zhan/backend/internal/deploy"
+	"zhan/backend/internal/docker"
+	"zhan/backend/internal/model"
+	"zhan/backend/internal/notify"
+	"zhan/backend/internal/testutil"
 )
 
 func TestAuthenticatedImportTaskLogsAndSettings(t *testing.T) {

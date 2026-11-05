@@ -12,7 +12,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/acme"
 	"io"
 	"net"
 	"net/http"
@@ -21,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/acme"
 )
 
 const stagingURL = "https://acme-staging-v02.api.letsencrypt.org/directory"

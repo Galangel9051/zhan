@@ -2,23 +2,26 @@ package deploy
 
 import (
 	"bytes"
-	"zhan/backend/internal/command"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+
+	"zhan/backend/internal/command"
 )
 
 type logWriter struct {
-	mu        sync.Mutex
-	file      *os.File
-	pending   []byte
-	written   int64
-	max       int64
-	skip      bool
-	truncated bool
-	err       error
+	mu         sync.Mutex
+	file       *os.File
+	pending    []byte
+	written    int64
+	max        int64
+	privateKey bool
+	skip       bool
+	truncated  bool
+	err        error
 }
 
 func (e *Engine) LogPath(id int64) string {
@@ -47,7 +50,18 @@ func (w *logWriter) line(p []byte) {
 		}
 		return
 	}
-	line := command.Redact(string(p))
+	text := string(p)
+	if w.privateKey {
+		if strings.Contains(text, "-----END ") && strings.Contains(text, "PRIVATE KEY-----") {
+			w.privateKey = false
+		}
+		return
+	}
+	if strings.Contains(text, "-----BEGIN ") && strings.Contains(text, "PRIVATE KEY-----") {
+		w.privateKey = !strings.Contains(text, "-----END ")
+		text = "[PRIVATE KEY REDACTED]\n"
+	}
+	line := command.Redact(text)
 	remaining := w.max - w.written
 	if int64(len(line)) > remaining {
 		line = "[当前行超出日志容量，已省略]\n"

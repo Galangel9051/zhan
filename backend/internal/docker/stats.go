@@ -6,7 +6,7 @@ import (
 	"errors"
 	"math"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -102,7 +102,7 @@ func (c *Client) Stats(ctx context.Context, projects []string) (StatsSnapshot, e
 			ids = append(ids, container.ID)
 		}
 	}
-	sort.Strings(ids)
+	slices.Sort(ids)
 	key := strings.Join(ids, ",")
 	c.statsMu.Lock()
 	defer c.statsMu.Unlock()

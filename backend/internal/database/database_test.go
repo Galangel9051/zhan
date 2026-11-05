@@ -1,10 +1,11 @@
 package database
 
 import (
-	"zhan/backend/internal/model"
 	"errors"
 	"path/filepath"
 	"testing"
+
+	"zhan/backend/internal/model"
 )
 
 func TestPersistenceConstraintsAndRecovery(t *testing.T) {

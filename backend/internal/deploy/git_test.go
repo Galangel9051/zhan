@@ -1,13 +1,14 @@
 package deploy
 
 import (
-	"zhan/backend/internal/command"
-	"zhan/backend/internal/model"
 	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"zhan/backend/internal/command"
+	"zhan/backend/internal/model"
 )
 
 func gitTest(t *testing.T, dir string, args ...string) string {

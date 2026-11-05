@@ -7,6 +7,7 @@
 package sshkey
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -14,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"zhan/backend/internal/command"
 )
 
 const (
@@ -75,6 +77,13 @@ func (m *Manager) Ensure() (Info, bool, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Info{}, false, err
 	}
+	for _, name := range []string{publicName, privateName + ".bak"} {
+		if _, err := os.Lstat(filepath.Join(m.dir, name)); err == nil {
+			return Info{}, false, errors.New("SSH 私钥缺失但仍有旧密钥记录，请先恢复私钥，避免覆盖原身份")
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return Info{}, false, err
+		}
+	}
 	if err := m.generateLocked(false); err != nil {
 		return Info{}, false, err
 	}
@@ -115,16 +124,42 @@ func (m *Manager) ResetKnownHosts() error {
 	if err := m.prepareLocked(); err != nil {
 		return err
 	}
-	return os.WriteFile(m.knownHostsPath(), nil, 0600)
+	root, err := os.OpenRoot(m.dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return writeAtomic(root, knownHostsName, nil, 0600)
 }
 
-// Command returns the GIT_SSH_COMMAND used for every Git invocation.
+// Command and Test share the exact same SSH configuration and identity.
 func (m *Manager) Command() string {
-	return fmt.Sprintf(
-		"ssh -i %s -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=%s",
-		shellQuote(m.privatePath()), shellQuote(m.knownHostsPath()),
-	)
+	args := append([]string{"ssh"}, m.sshArgs()...)
+	for i := range args {
+		args[i] = shellQuote(args[i])
+	}
+	return strings.Join(args, " ")
 }
+
+func (m *Manager) sshArgs() []string {
+	return []string{
+		"-F", "/dev/null", "-i", strings.ReplaceAll(m.privatePath(), "%", "%%"),
+		"-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none",
+		"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
+		"-o", "UserKnownHostsFile=" + sshConfigQuote(m.knownHostsPath()),
+		"-o", "ConnectTimeout=10",
+	}
+}
+
+// OpenSSH parses -o values again after shell parsing, and expands percent tokens.
+func sshConfigQuote(path string) string {
+	path = strings.ReplaceAll(path, "%", "%%")
+	path = strings.ReplaceAll(path, `\`, `\\`)
+	return `"` + strings.ReplaceAll(path, `"`, `\"`) + `"`
+}
+
+// This wrapper keeps stdout and stderr together in the runner's bounded writer.
+type connectionOutput struct{ command.Buffer }
 
 func (m *Manager) Test(ctx context.Context, host string) (TestResult, error) {
 	host = strings.ToLower(strings.TrimSpace(host))
@@ -137,31 +172,24 @@ func (m *Manager) Test(ctx context.Context, host string) (TestResult, error) {
 	if _, err := m.Info(); err != nil {
 		return TestResult{}, err
 	}
-	args := []string{
-		"-i", m.privatePath(),
-		"-o", "IdentitiesOnly=yes",
-		"-o", "BatchMode=yes",
-		"-o", "StrictHostKeyChecking=accept-new",
-		"-o", "UserKnownHostsFile=" + m.knownHostsPath(),
-		"-o", "ConnectTimeout=10",
-		"-T", "git@" + host,
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	args := append(m.sshArgs(), "-T", "git@"+host)
+	outputBuffer := &connectionOutput{Buffer: command.Buffer{Limit: 4096}}
+	err := (command.OSRunner{}).Run(ctx, "", "ssh", args, outputBuffer)
+	output := strings.TrimSpace(command.Redact(string(outputBuffer.Data)))
+	if len(output) > 4096 {
+		output = output[:4096]
 	}
-	cmd := exec.CommandContext(ctx, "ssh", args...)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	data, err := cmd.CombinedOutput()
-	if len(data) > 4096 {
-		data = data[:4096]
-	}
-	output := strings.TrimSpace(string(data))
 	result := TestResult{Host: host, Output: output}
+	exit, exited := errors.AsType[*command.Error](err)
+	authenticatedExit := ctx.Err() == nil && (err == nil || (exited && exit.Code == 1))
 	lower := strings.ToLower(output)
 	switch {
-	case strings.Contains(lower, "successfully authenticated"),
-		strings.Contains(lower, "welcome to gitlab"),
-		strings.Contains(lower, "you've successfully authenticated"):
+	case authenticatedExit && (strings.Contains(lower, "successfully authenticated") || strings.Contains(lower, "welcome to gitlab")):
 		result.OK = true
 		result.Message = "SSH 连接成功，远程平台已识别这把密钥。"
-	case err == nil:
+	case err == nil && ctx.Err() == nil:
 		result.OK = true
 		result.Message = "SSH 连接成功。"
 	default:
@@ -199,28 +227,89 @@ func (m *Manager) prepareLocked() error {
 	if err := os.MkdirAll(m.dir, 0700); err != nil {
 		return fmt.Errorf("创建 SSH 目录失败：%w", err)
 	}
-	if err := os.Chmod(m.dir, 0700); err != nil {
-		return fmt.Errorf("修正 SSH 目录权限失败：%w", err)
+	stat, err := os.Lstat(m.dir)
+	if err != nil {
+		return err
 	}
-	if _, err := os.Stat(m.knownHostsPath()); errors.Is(err, os.ErrNotExist) {
-		if err := os.WriteFile(m.knownHostsPath(), nil, 0600); err != nil {
-			return fmt.Errorf("创建 known_hosts 失败：%w", err)
+	if !stat.IsDir() {
+		return errors.New("SSH 目录不能是符号链接或非目录文件")
+	}
+	root, err := os.OpenRoot(m.dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	dir, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	err = dir.Chmod(0700)
+	closeErr := dir.Close()
+	if err != nil || closeErr != nil {
+		return errors.Join(err, closeErr)
+	}
+	// Reject links and special files before reading or changing permissions.
+	for _, name := range []string{privateName, publicName, knownHostsName, privateName + ".bak", publicName + ".bak"} {
+		stat, err := root.Lstat(name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !stat.Mode().IsRegular() {
+			return fmt.Errorf("SSH 文件 %s 必须是普通文件，不能使用符号链接", name)
+		}
+		file, err := root.Open(name)
+		if err != nil {
+			return err
+		}
+		mode := os.FileMode(0600)
+		if name == publicName || name == publicName+".bak" {
+			mode = 0644
+		}
+		err = file.Chmod(mode)
+		closeErr := file.Close()
+		if err != nil || closeErr != nil {
+			return fmt.Errorf("修正 %s 权限失败：%w", name, errors.Join(err, closeErr))
 		}
 	}
-	return nil
+	if _, err := root.Lstat(knownHostsName); errors.Is(err, os.ErrNotExist) {
+		return writeAtomic(root, knownHostsName, nil, 0600)
+	} else {
+		return err
+	}
+}
+
+// writeAtomic deliberately replaces a fixed name within one directory. Unique,
+// exclusive temporary files avoid following stale .tmp links or exposing a partial key.
+func writeAtomic(root *os.Root, name string, data []byte, mode os.FileMode) error {
+	temp := "." + name + "." + rand.Text() + ".tmp"
+	file, err := root.OpenFile(temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	defer root.Remove(temp)
+	if _, err := file.Write(data); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	if err := file.Sync(); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	if err := root.Rename(temp, name); err != nil {
+		return err
+	}
+	dir, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	return errors.Join(dir.Sync(), dir.Close())
 }
 
 func (m *Manager) generateLocked(backup bool) error {
-	if backup {
-		if _, err := os.Stat(m.privatePath()); err == nil {
-			if err := os.Rename(m.privatePath(), m.privatePath()+".bak"); err != nil {
-				return fmt.Errorf("备份旧私钥失败：%w", err)
-			}
-			if _, err := os.Stat(m.publicPath()); err == nil {
-				_ = os.Rename(m.publicPath(), m.publicPath()+".bak")
-			}
-		}
-	}
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return fmt.Errorf("生成 SSH 密钥失败：%w", err)
@@ -233,91 +322,87 @@ func (m *Manager) generateLocked(backup bool) error {
 	if err != nil {
 		return fmt.Errorf("编码 SSH 公钥失败：%w", err)
 	}
-	privateTmp := m.privatePath() + ".tmp"
-	publicTmp := m.publicPath() + ".tmp"
-	if err = os.WriteFile(privateTmp, pem.EncodeToMemory(block), 0600); err != nil {
-		return fmt.Errorf("写入 SSH 私钥失败：%w", err)
+	root, err := os.OpenRoot(m.dir)
+	if err != nil {
+		return err
 	}
-	if err = os.WriteFile(publicTmp, ssh.MarshalAuthorizedKey(sshPub), 0644); err != nil {
-		_ = os.Remove(privateTmp)
-		return fmt.Errorf("写入 SSH 公钥失败：%w", err)
+	defer root.Close()
+	oldPublic, publicErr := root.ReadFile(publicName)
+	if publicErr != nil && !errors.Is(publicErr, os.ErrNotExist) {
+		return publicErr
 	}
-	if err = os.Rename(privateTmp, m.privatePath()); err != nil {
-		return fmt.Errorf("保存 SSH 私钥失败：%w", err)
+	if backup {
+		oldPrivate, err := root.ReadFile(privateName)
+		if err != nil {
+			return fmt.Errorf("读取旧私钥失败：%w", err)
+		}
+		// Copy backups; never remove the active private key before the replacement is ready.
+		if err := writeAtomic(root, privateName+".bak", oldPrivate, 0600); err != nil {
+			return fmt.Errorf("备份旧私钥失败：%w", err)
+		}
+		if publicErr == nil {
+			if err := writeAtomic(root, publicName+".bak", oldPublic, 0644); err != nil {
+				return fmt.Errorf("备份旧公钥失败：%w", err)
+			}
+		}
 	}
-	if err = os.Rename(publicTmp, m.publicPath()); err != nil {
+	if err := writeAtomic(root, publicName, ssh.MarshalAuthorizedKey(sshPub), 0644); err != nil {
 		return fmt.Errorf("保存 SSH 公钥失败：%w", err)
 	}
-	return m.repairPermissionsLocked()
-}
-
-func (m *Manager) repairPermissionsLocked() error {
-	if err := os.Chmod(m.dir, 0700); err != nil {
-		return err
+	// The private key is authoritative. Publish it only after all other writes succeed.
+	if err := writeAtomic(root, privateName, pem.EncodeToMemory(block), 0600); err != nil {
+		var restoreErr error
+		if publicErr == nil {
+			restoreErr = writeAtomic(root, publicName, oldPublic, 0644)
+		} else {
+			restoreErr = root.Remove(publicName)
+		}
+		return fmt.Errorf("保存 SSH 私钥失败：%w", errors.Join(err, restoreErr))
 	}
-	if err := os.Chmod(m.privatePath(), 0600); err != nil {
-		return err
-	}
-	_ = os.Chmod(m.publicPath(), 0644)
-	_ = os.Chmod(m.knownHostsPath(), 0600)
 	return nil
 }
 
 func (m *Manager) infoLocked() (Info, error) {
-	if err := m.repairPermissionsLocked(); err != nil {
+	root, err := os.OpenRoot(m.dir)
+	if err != nil {
 		return Info{}, err
 	}
-	publicBytes, err := os.ReadFile(m.publicPath())
+	defer root.Close()
+	private, err := root.ReadFile(privateName)
 	if err != nil {
-		publicBytes, err = m.derivePublicLocked()
-		if err != nil {
-			return Info{}, err
+		return Info{}, fmt.Errorf("读取 SSH 私钥失败：%w", err)
+	}
+	signer, err := ssh.ParsePrivateKey(private)
+	if err != nil {
+		return Info{}, fmt.Errorf("解析 SSH 私钥失败：%w", err)
+	}
+	publicKey := signer.PublicKey()
+	publicBytes := ssh.MarshalAuthorizedKey(publicKey)
+	cached, err := root.ReadFile(publicName)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return Info{}, err
+	}
+	if !bytes.Equal(cached, publicBytes) {
+		if err := writeAtomic(root, publicName, publicBytes, 0644); err != nil {
+			return Info{}, fmt.Errorf("修复 SSH 公钥失败：%w", err)
 		}
 	}
-	publicKey, _, _, _, err := ssh.ParseAuthorizedKey(publicBytes)
-	if err != nil {
-		return Info{}, fmt.Errorf("读取 SSH 公钥失败：%w", err)
-	}
-	stat, err := os.Stat(m.privatePath())
+	stat, err := root.Stat(privateName)
 	if err != nil {
 		return Info{}, err
 	}
-	info := Info{
-		PublicKey:      strings.TrimSpace(string(ssh.MarshalAuthorizedKey(publicKey))),
-		Fingerprint:    ssh.FingerprintSHA256(publicKey),
-		KeyPath:        m.privatePath(),
-		KnownHostsPath: m.knownHostsPath(),
-		CreatedAt:      stat.ModTime().UTC().Format(time.RFC3339),
+	info := Info{PublicKey: strings.TrimSpace(string(publicBytes)), Fingerprint: ssh.FingerprintSHA256(publicKey), KeyPath: m.privatePath(), KnownHostsPath: m.knownHostsPath(), CreatedAt: stat.ModTime().UTC().Format(time.RFC3339)}
+	known, err := root.ReadFile(knownHostsName)
+	if err != nil {
+		return Info{}, fmt.Errorf("读取已信任主机失败：%w", err)
 	}
-	if known, err := os.ReadFile(m.knownHostsPath()); err == nil {
-		for _, line := range strings.Split(string(known), "\n") {
-			line = strings.TrimSpace(line)
-			if line != "" && !strings.HasPrefix(line, "#") {
-				info.KnownHostsCount++
-			}
+	for line := range strings.SplitSeq(string(known), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			info.KnownHostsCount++
 		}
 	}
 	return info, nil
-}
-
-func (m *Manager) derivePublicLocked() ([]byte, error) {
-	raw, err := os.ReadFile(m.privatePath())
-	if err != nil {
-		return nil, fmt.Errorf("读取 SSH 私钥失败：%w", err)
-	}
-	key, err := ssh.ParseRawPrivateKey(raw)
-	if err != nil {
-		return nil, fmt.Errorf("解析 SSH 私钥失败：%w", err)
-	}
-	signer, err := ssh.NewSignerFromKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("解析 SSH 私钥失败：%w", err)
-	}
-	publicBytes := ssh.MarshalAuthorizedKey(signer.PublicKey())
-	if err = os.WriteFile(m.publicPath(), publicBytes, 0644); err != nil {
-		return nil, fmt.Errorf("写入 SSH 公钥失败：%w", err)
-	}
-	return publicBytes, nil
 }
 
 func (m *Manager) privatePath() string    { return filepath.Join(m.dir, privateName) }

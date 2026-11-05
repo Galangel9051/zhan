@@ -4,11 +4,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"zhan/backend/internal/command"
 )
 
@@ -83,6 +84,6 @@ func (s *Server) inspectGitBranches(c *gin.Context) {
 	for branch := range seen {
 		result.Branches = append(result.Branches, branch)
 	}
-	sort.Strings(result.Branches)
+	slices.Sort(result.Branches)
 	c.JSON(200, gin.H{"data": result})
 }

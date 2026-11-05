@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	"zhan/backend/internal/command"
 	"zhan/backend/internal/database"
 	"zhan/backend/internal/model"
@@ -131,8 +132,7 @@ func decodeConfiguration(c *gin.Context, target any) bool {
 		}
 	}
 	if err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			fail(c, 413, "配置文件不能超过 4 MiB")
 		} else {
 			fail(c, 400, "配置文件格式无效："+err.Error())

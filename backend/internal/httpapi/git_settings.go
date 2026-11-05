@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"zhan/backend/internal/command"
 	"zhan/backend/internal/sshkey"
-
-	"github.com/gin-gonic/gin"
 )
 
 func (s *Server) gitSettings(c *gin.Context) {
@@ -38,7 +38,7 @@ func (s *Server) regenerateGitKey(c *gin.Context) {
 		}
 	}
 	if !input.Confirm {
-		fail(c, 400, "重新生成后旧公钥会立即失效，请勾选确认后再操作")
+		fail(c, 400, "重新生成后栈长将改用新密钥，旧公钥需到 Git 平台手动撤销；请勾选确认后再操作")
 		return
 	}
 	info, err := s.Git.Regenerate()
