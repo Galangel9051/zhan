@@ -28,6 +28,8 @@ while :; do
       new="$(git rev-parse FETCH_HEAD)"
       if [ "$old" = "$new" ]; then
         log "已是最新 $old"
+      elif git merge-base --is-ancestor "$new" "$old"; then
+        log "本地领先远端（$old），等待远端合并"
       else
         log "发现新提交 $old -> $new，开始更新"
         if git merge --ff-only "$new" >/dev/null 2>&1; then
