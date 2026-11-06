@@ -128,6 +128,13 @@ func TestConfigurationExportPreviewAndImport(t *testing.T) {
 		}
 		return r
 	}
+	backup.SMTP.Enabled = new(false)
+	disabledPreview := decode(call("POST", "import/preview", backup, token, u.CSRF, 200).Body.Bytes())
+	if disabledPreview.SMTPEnabled {
+		t.Fatal("disabled SMTP reported enabled in import preview")
+	}
+	backup.SMTP.Enabled = nil
+
 	before := currentRevision()
 	backup.System.Retention = 60
 	backup.Projects[0].Name = "Restored fixture"

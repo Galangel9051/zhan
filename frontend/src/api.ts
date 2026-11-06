@@ -12,7 +12,7 @@ export interface Stack {
  runtime_status: string; services: Service[]; last_task?: Task; runtime_error?: string;
 }
 export interface Discovery { name: string; status: string; config_files: string[] }
-export interface SMTP { host: string; port: number; username: string; password?: string; password_set: boolean; tls_mode: string; from: string; recipients: string[]; stages: string[]; cooldown_minutes: number }
+export interface SMTP { enabled?: boolean; host: string; port: number; username: string; password?: string; password_set: boolean; tls_mode: string; from: string; recipients: string[]; stages: string[]; cooldown_minutes: number }
 export interface Settings { smtp: SMTP; allowed_roots: string[]; listen: string; workers: number; log_retention_days: number; max_log_mb: number; retry_delays_seconds: number[]; secure_cookies: boolean }
 export interface GitKeyInfo { public_key: string; fingerprint: string; key_path: string; known_hosts_path: string; created_at: string; known_hosts_count: number }
 export interface GitTestResult { ok: boolean; host: string; message: string; hint: string; output: string }

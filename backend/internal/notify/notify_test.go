@@ -101,6 +101,34 @@ func TestFailureNotificationDedupAndIndependentError(t *testing.T) {
 	if delivered.Load() != 1 {
 		t.Fatalf("mail not deduplicated: %d", delivered.Load())
 	}
+	cfg.Enabled = new(false)
+	if err := n.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	task.Commit = "disabled-commit"
+	n.Failure(task, s)
+	if err := n.TestConfig(cfg); err == nil {
+		t.Fatal("disabled test mail accepted")
+	}
+	if delivered.Load() != 1 {
+		t.Fatal("disabled notification sent mail")
+	}
+	var skippedLogs int
+	if err := db.QueryRow("SELECT count(*) FROM notification_logs").Scan(&skippedLogs); err != nil {
+		t.Fatal(err)
+	}
+	if skippedLogs != 1 {
+		t.Fatal("disabled mail created delivery records")
+	}
+	cfg.Enabled = new(true)
+	if err := n.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	n.Failure(task, s)
+	if delivered.Load() != 2 {
+		t.Fatal("re-enabling did not resume mail delivery")
+	}
+
 	listener.Close()
 	task.Commit = "commit-b"
 	n.Failure(task, s)
@@ -221,5 +249,79 @@ func TestUnsavedSMTPTestUsesEnteredPasswordWithoutSaving(t *testing.T) {
 	entered.Username = "changed-user"
 	if err = n.TestConfig(entered); err == nil || !strings.Contains(err.Error(), "重新填写密码") {
 		t.Fatal("stored password was reused for changed connection settings")
+	}
+}
+
+func TestSMTPEnableSwitchPreservesConfigurationAndCredentials(t *testing.T) {
+	dir := t.TempDir()
+	db, err := database.Open(filepath.Join(dir, "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	a, err := auth.New(db, dir, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := &Notifier{DB: db, Auth: a}
+	cfg := model.SMTP{Host: "smtp.example.invalid", Port: 587, Username: "sender@example.invalid", Password: "existing-password", From: "sender@example.invalid", Recipients: []string{"recipient@example.invalid"}, TLS: "starttls", Cooldown: 30}
+	if err := n.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	var before string
+	if err := db.QueryRow("SELECT ciphertext FROM credentials WHERE name='smtp_password'").Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Password = ""
+	cfg.Enabled = new(false)
+	if err := n.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := n.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Enabled == nil || *got.Enabled || got.Host != cfg.Host || got.Username != cfg.Username || !got.PasswordSet || len(got.Recipients) != 1 {
+		t.Fatalf("configuration lost: %+v", got)
+	}
+	if err := n.Send(got, "test", "body"); err == nil {
+		t.Fatal("disabled sender accepted mail")
+	}
+	var after string
+	if err := db.QueryRow("SELECT ciphertext FROM credentials WHERE name='smtp_password'").Scan(&after); err != nil || before != after {
+		t.Fatal("switch replaced saved credential")
+	}
+	cfg.Enabled = new(true)
+	if err := n.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err = n.Settings()
+	if err != nil || got.Enabled == nil || !*got.Enabled || !got.PasswordSet {
+		t.Fatal("could not re-enable existing configuration")
+	}
+	// Old backups and settings omit enabled; their behavior remains host-based.
+	cfg.Enabled = nil
+	if err := db.Setting("smtp", cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err = n.Settings()
+	if err != nil || got.Enabled == nil || !*got.Enabled {
+		t.Fatal("legacy configured SMTP was disabled")
+	}
+	cfg.Host = ""
+	if err := db.Setting("smtp", cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err = n.Settings()
+	if err != nil || got.Enabled == nil || *got.Enabled {
+		t.Fatal("unconfigured SMTP reported enabled")
+	}
+	disabled := model.SMTP{Enabled: new(false), Host: "incomplete host", Cooldown: 30}
+	if err := n.Save(disabled); err != nil {
+		t.Fatal(err)
+	}
+	disabled.Enabled = new(true)
+	if err := n.Save(disabled); err == nil {
+		t.Fatal("enabled incomplete configuration was accepted")
 	}
 }
