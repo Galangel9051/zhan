@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Boxes, ChevronRight, Container as ContainerIcon, Ro
 import { Badge } from './App'
 import { date, short, type Container, type Stack } from './api'
 import RuntimeActions from './RuntimeActions'
+import ContainerPorts from './ContainerPorts'
 import { useContainerStats } from './ResourceMetrics'
 import { aggregateResources, formatBytes, formatCPU } from './resource-utils'
 import { columnDefinitions, columnStorageKey, defaultColumns, normalizeColumns, type ColumnKey, type ColumnPreference } from './container-columns'
@@ -72,7 +73,7 @@ export default function ContainerTable({ stacks, open, action }: Props) {
    case 'network': return <div className="resource-value" title="容器启动以来累计接收 / 发送字节"><span>{formatBytes(metrics?.network_rx)} / {formatBytes(metrics?.network_tx)}</span><small>接收 / 发送</small></div>
    case 'disk': return <div className="resource-value" title="容器启动以来累计磁盘读取 / 写入字节，并非磁盘空间占用"><span>{formatBytes(metrics?.block_read)} / {formatBytes(metrics?.block_write)}</span><small>读取 / 写入</small></div>
    case 'pids': return metrics?.pids ?? '—'
-   case 'ports': { const ports = [...new Set(row.containers.map(container => container.ports).filter(Boolean))].join(', '); return <span className="container-cell-text" title={ports}>{ports || '—'}</span> }
+   case 'ports': return row.container ? <ContainerPorts ports={row.container.ports} state={row.container.state} /> : '—'
    case 'image': { const images = row.container ? row.container.image : [...new Set(row.containers.map(container => container.image).filter(Boolean))].join(', '); return <code className="container-cell-text" title={images}>{images || '—'}</code> }
    case 'id': return row.container ? <code title={row.container.id}>{short(row.container.id)}</code> : '—'
    case 'started': return row.container?.started_at && !row.container.started_at.startsWith('0001-') ? <span title={row.container.started_at}>{date(row.container.started_at)}</span> : '—'
