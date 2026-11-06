@@ -8,6 +8,9 @@ RUN npm run build
 
 FROM golang:1.26-alpine AS backend
 WORKDIR /src/backend
+# Use a Go module mirror reachable from mainland China; the default
+# proxy.golang.org is blocked and makes every image build fail.
+ENV GOPROXY=https://goproxy.cn,direct
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
