@@ -29,6 +29,9 @@ func (n *Notifier) Settings() (model.SMTP, error) {
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return s, err
 	}
+	if s.Enabled == nil {
+		s.Enabled = new(s.Host != "")
+	}
 	var count int
 	err = n.DB.QueryRow("SELECT count(*) FROM credentials WHERE name='smtp_password'").Scan(&count)
 	s.Password = ""
@@ -36,7 +39,7 @@ func (n *Notifier) Settings() (model.SMTP, error) {
 	return s, err
 }
 func validateSMTP(s model.SMTP) error {
-	if s.Host != "" {
+	if s.Host != "" && (s.Enabled == nil || *s.Enabled) {
 		if strings.ContainsAny(s.Host, "\r\n /\\") || s.Port < 1 || s.Port > 65535 {
 			return errors.New("SMTP 地址或端口无效")
 		}
@@ -66,6 +69,9 @@ func validateSMTP(s model.SMTP) error {
 func Validate(s model.SMTP) error { return validateSMTP(s) }
 
 func (n *Notifier) Save(s model.SMTP) error {
+	if s.Enabled == nil {
+		s.Enabled = new(s.Host != "")
+	}
 	if err := validateSMTP(s); err != nil {
 		return err
 	}
@@ -98,6 +104,9 @@ func addresses(s model.SMTP) error {
 	return nil
 }
 func (n *Notifier) Send(s model.SMTP, subject, body string) error {
+	if s.Enabled != nil && !*s.Enabled {
+		return errors.New("邮件通知已关闭，请先开启并保存配置")
+	}
 	if s.Host == "" {
 		return errors.New("尚未配置 SMTP")
 	}
@@ -183,7 +192,7 @@ func (n *Notifier) Send(s model.SMTP, subject, body string) error {
 }
 func (n *Notifier) Failure(t model.Task, s model.Stack) {
 	cfg, err := n.Settings()
-	if err != nil || !s.Notify || cfg.Host == "" {
+	if err != nil || !s.Notify || cfg.Host == "" || (cfg.Enabled != nil && !*cfg.Enabled) {
 		return
 	}
 	enabled := false
@@ -220,6 +229,9 @@ func (n *Notifier) Test() error {
 
 // TestConfig sends with the submitted settings without saving them.
 func (n *Notifier) TestConfig(cfg model.SMTP) error {
+	if cfg.Enabled != nil && !*cfg.Enabled {
+		return errors.New("邮件通知已关闭，请先开启并保存配置")
+	}
 	if cfg.Cooldown == 0 {
 		cfg.Cooldown = 30
 	}

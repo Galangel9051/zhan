@@ -86,9 +86,18 @@ func (m *Manager) Start() error {
 	return nil
 }
 func (m *Manager) Close() { m.cancel(); m.wg.Wait() }
-func (m *Manager) load() (Config, error) {
+func (m *Manager) readConfig(key string) (Config, error) {
 	c := Defaults()
-	err := m.DB.GetSetting("proxy_config", &c)
+	c.Settings.HTTPSEnabled, c.Settings.DuckDNSEnabled = nil, nil
+	if err := m.DB.GetSetting(key, &c); err != nil {
+		return Defaults(), err
+	}
+	c.Settings.HTTPSEnabled = new(c.Settings.HTTPSOn())
+	c.Settings.DuckDNSEnabled = new(c.Settings.DuckDNSOn())
+	return c, nil
+}
+func (m *Manager) load() (Config, error) {
+	c, err := m.readConfig("proxy_config")
 	if errors.Is(err, sql.ErrNoRows) {
 		err = nil
 	}
@@ -104,7 +113,7 @@ func (m *Manager) State(ctx context.Context) (State, error) {
 	}
 	for i := range c.Hosts {
 		h := &c.Hosts[i]
-		if h.HTTPS {
+		if c.Settings.HTTPSOn() && h.HTTPS {
 			cert, e := m.certificate(*h, c.Settings)
 			if e != nil {
 				h.CertError = "尚无有效证书，请先申请"
@@ -131,8 +140,7 @@ func (m *Manager) State(ctx context.Context) (State, error) {
 	if err != nil {
 		return State{}, err
 	}
-	active := Defaults()
-	_ = m.DB.GetSetting("proxy_active", &active)
+	active, _ := m.readConfig("proxy_active")
 	state := State{Config: c, Jobs: jobs, Busy: busy, Dirty: fingerprint(c) != fingerprint(active), Runtime: "stopped", Preview: Render(c)}
 	if _, err = os.Stat(filepath.Join(m.Dir, "compose.yaml")); err == nil {
 		out, e := m.compose(ctx, filepath.Join(m.Dir, "compose.yaml"), "ps", "--format", "json")
@@ -234,7 +242,7 @@ func (m *Manager) Enqueue(action, id, actor string) (Job, error) {
 			return Job{}, err
 		}
 	}
-	if action == "dns" && (c.Settings.DuckDomain == "" || c.Settings.DuckToken == "") {
+	if action == "dns" && (!c.Settings.DuckDNSOn() || c.Settings.DuckDomain == "" || c.Settings.DuckToken == "") {
 		return Job{}, errors.New("请先保存 DuckDNS 域名与 Token")
 	}
 	result, err := m.DB.Exec("INSERT INTO proxy_jobs(action,host_id) VALUES(?,?)", action, id)
@@ -282,7 +290,10 @@ func (m *Manager) compose(ctx context.Context, path string, args ...string) (str
 	return out, nil
 }
 func (m *Manager) composeFile(s Settings, confDir string) ([]byte, error) {
-	ports := []string{net.JoinHostPort(s.Bind, strconv.Itoa(s.HTTPPort)) + ":80", net.JoinHostPort(s.Bind, strconv.Itoa(s.HTTPSPort)) + ":443"}
+	ports := []string{net.JoinHostPort(s.Bind, strconv.Itoa(s.HTTPPort)) + ":80"}
+	if s.HTTPSOn() {
+		ports = append(ports, net.JoinHostPort(s.Bind, strconv.Itoa(s.HTTPSPort))+":443")
+	}
 	return yaml.Marshal(map[string]any{"services": map[string]any{"proxy": map[string]any{"image": "nginx:stable-alpine", "network_mode": "bridge", "restart": "unless-stopped", "ports": ports, "extra_hosts": []string{"host.docker.internal:host-gateway"}, "volumes": []any{map[string]any{"type": "bind", "source": confDir, "target": "/etc/nginx/cm", "read_only": true}, map[string]any{"type": "bind", "source": filepath.Join(m.Dir, "certs"), "target": "/etc/nginx/certs", "read_only": true}}, "command": []string{"nginx", "-c", "/etc/nginx/cm/nginx.conf", "-g", "daemon off;"}, "labels": map[string]string{"io.zhan.proxy": "true"}, "logging": map[string]any{"driver": "json-file", "options": map[string]string{"max-size": "10m", "max-file": "3"}}}}})
 }
 func atomicWrite(path string, data []byte) error {
@@ -328,7 +339,7 @@ func (m *Manager) execute(ctx context.Context, action string, h Host, c Config) 
 		return "Nginx 已停止，保留代理规则与证书", err
 	}
 	for _, v := range c.Hosts {
-		if v.Enabled && v.HTTPS {
+		if c.Settings.HTTPSOn() && v.Enabled && v.HTTPS {
 			if _, err := m.certificate(v, c.Settings); err != nil {
 				return "", fmt.Errorf("%s：没有有效证书，请先申请证书", v.Domain)
 			}
@@ -448,12 +459,12 @@ func (m *Manager) maintain() {
 		return
 	}
 	// Renew only domains from the applied snapshot, never apply pending edits.
-	active := Defaults()
-	if m.DB.GetSetting("proxy_active", &active) != nil {
+	active, err := m.readConfig("proxy_active")
+	if err != nil {
 		return
 	}
 	for _, h := range active.Hosts {
-		if !h.Enabled || !h.HTTPS {
+		if !c.Settings.HTTPSOn() || !active.Settings.HTTPSOn() || !c.Settings.DuckDNSOn() || !h.Enabled || !h.HTTPS {
 			continue
 		}
 		found := false
@@ -487,7 +498,7 @@ func (m *Manager) maintain() {
 	}
 	var at int64
 	_ = m.DB.GetSetting("proxy_ddns_attempt", &at)
-	if c.Settings.DDNS && time.Now().Unix()-at >= 600 {
+	if c.Settings.DuckDNSOn() && c.Settings.DDNS && time.Now().Unix()-at >= 600 {
 		if _, err := m.Enqueue("dns", "", "scheduler"); err == nil {
 			_ = m.DB.Setting("proxy_ddns_attempt", time.Now().Unix())
 		}

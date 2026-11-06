@@ -4,11 +4,11 @@
 
 ## 第一次使用
 
-1. 打开「网关 / DuckDNS」。网关默认监听 Nginx 所在服务器的全部 IPv4 网卡（`0.0.0.0`），HTTP / HTTPS 端口为 `80 / 443`。也可指定网关服务器的某个 IP。确保端口未被其他服务占用。
-2. 在 [DuckDNS](https://www.duckdns.org/) 登录并注册免费主域名，例如 `myhome.duckdns.org`。工具使用更新 API，不能替你创建账户或抢注主域名。在配置页填入该域名和 Token。
+1. 打开「网关 / DuckDNS」。网关默认监听 Nginx 所在服务器的全部 IPv4 网卡（`0.0.0.0`），默认仅开启 HTTP，端口为 `80`。需要 HTTPS 时勾选「启用 HTTPS」，再配置 HTTPS 端口（默认 `443`）。也可指定网关服务器的某个 IP。确保端口未被其他服务占用。
+2. 在 [DuckDNS](https://www.duckdns.org/) 登录并注册免费主域名，例如 `myhome.duckdns.org`。工具使用更新 API，不能替你创建账户或抢注主域名。在配置页勾选「启用 DuckDNS 与免费证书」后，填入该域名和 Token。仅使用自有 DNS 的 HTTP 转发可保持关闭。
 3. 填写解析 IP：局域网使用填写**网关**的局域网 IP，如 `192.168.1.10`；留空由 DuckDNS 检测公网 IPv4。保存后点击「更新解析 IP」。可开启每 10 分钟更新，失败原因在执行记录查看。
 4. 新增规则，例如 `app.myhome.duckdns.org → http://192.168.1.20:3000`、`nas.myhome.duckdns.org → http://192.168.1.30:5000`。编辑完整域名前缀就能更换子域名。所有子域名到达同一个网关，由 Nginx 再分发到对应端口。自有域名也可配置 HTTP 转发，需自行设置 DNS；当前自动签发证书仅支持配置的 DuckDNS 主域名及其子域名。
-5. 如需 HTTPS，先在配置页同意 Let's Encrypt 服务条款，联系邮箱可选、留空也可申请和自动续期；然后在规则中开启 HTTPS 并保存，点击规则旁的「申请证书」。任务成功后点击「应用并启动」。进入证书最后三分之一有效期时自动续期；失败最多每天自动重试一次，也可手动重试。
+5. 如需 HTTPS，先启用网关 HTTPS 和 DuckDNS，再在配置页同意 Let's Encrypt 服务条款，联系邮箱可选、留空也可申请和自动续期；然后在规则中开启 HTTPS 并保存，点击规则旁的「申请证书」。任务成功后点击「应用并启动」。进入证书最后三分之一有效期时自动续期；失败最多每天自动重试一次，也可手动重试。
 
 DNS-01 验证不要求公网开放 80 端口，可用于局域网服务。但服务器需要连接 DuckDNS、Let's Encrypt 和公共 DNS（1.1.1.1 / 8.8.8.8）。域名仍需从访问设备解析并能到达网关；部分路由器的 DNS 重绑定保护会阻止公网域名解析到私网地址，需要在你管理的 DNS 中适当放行该域名。公网访问还需要公网可达地址、路由器端口映射或已有 VPN，不会自动穿透 NAT。
 
@@ -46,3 +46,11 @@ ZHAN_PROXY_DOCKER_TEST=1 go test -v ./internal/proxy -run TestManagedNginxHTTPAn
 测试包括上游/域名注入防护、配置版本冲突、凭据加密与不回显、失败任务、模拟完整 ACME DNS-01 签发及 TXT 清理、证书原子替换、校验失败不替换配置、启动失败恢复旧配置。真实 Docker 测试验证 HTTP、带域名验证的 HTTPS、转发头、非标准端口跳转、重载以及错误配置下原服务仍可访问。没有修改真实 DuckDNS 解析或签发真实证书；需配置实际账户后验收。
 
 参考：[DuckDNS API](https://www.duckdns.org/spec.jsp)、[Let's Encrypt DNS-01](https://letsencrypt.org/docs/challenge-types/)、[Nginx 命令行](https://nginx.org/en/docs/switches.html)。
+
+## 按需展开配置
+
+HTTPS 端口仅在勾选「启用 HTTPS」后显示；DuckDNS 域名、Token、解析 IP 和自动更新选项仅在对应功能开启后显示。证书邮箱、测试环境和服务条款在 HTTPS 与 DuckDNS 同时开启后显示，展开和收起均有过渡。
+
+关闭功能会保留已填写的值。关闭 HTTPS 后，保存并应用网关即可停止发布 HTTPS 端口，原规则暂按 HTTP 转发，重新开启后恢复规则中的 HTTPS 设置。关闭 DuckDNS 会暂停手动/自动 DNS 更新及自动签证，已有证书继续服务已开启的 HTTPS。
+
+旧版已保存的网关配置保留原 HTTPS 行为；已配置 DuckDNS 域名的旧配置也会保持启用。

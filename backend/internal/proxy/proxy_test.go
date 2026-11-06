@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"zhan/backend/internal/auth"
 	"zhan/backend/internal/command"
 	"zhan/backend/internal/database"
@@ -69,6 +71,8 @@ func setup(t *testing.T, r command.Runner) *Manager {
 }
 func fixture() Config {
 	c := Defaults()
+	c.Settings.HTTPSEnabled = new(true)
+	c.Settings.DuckDNSEnabled = nil
 	c.Hosts = []Host{{ID: "0123456789abcdef", Domain: "app.home.duckdns.org", Upstream: "http://192.168.1.20:3000", Name: "LAN", Enabled: true, Websocket: true}}
 	return c
 }
@@ -191,4 +195,131 @@ func TestJobsAndCertificatePrerequisites(t *testing.T) {
 		time.Sleep(time.Millisecond * 5)
 	}
 	t.Fatal("job did not finish")
+}
+
+func TestGatewayFeatureSwitches(t *testing.T) {
+	c := fixture()
+	c.Hosts[0].HTTPS = true
+	c.Hosts[0].Redirect = true
+	c.Settings.HTTPSEnabled = new(false)
+	c.Settings.HTTPSPort = c.Settings.HTTPPort
+	if err := Normalize(&c); err != nil {
+		t.Fatal(err)
+	}
+	out := Render(c)
+	if strings.Contains(out, "listen 443") || strings.Contains(out, "return 308") || !strings.Contains(out, "proxy_pass http://192.168.1.20:3000") {
+		t.Fatal("disabled HTTPS still rendered TLS or redirect")
+	}
+	m := setup(t, &fakeRunner{})
+	raw, err := m.composeFile(c.Settings, m.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var compose struct {
+		Services map[string]struct {
+			Ports []string `yaml:"ports"`
+		} `yaml:"services"`
+	}
+	if err := yaml.Unmarshal(raw, &compose); err != nil {
+		t.Fatal(err)
+	}
+	if len(compose.Services["proxy"].Ports) != 1 {
+		t.Fatal("HTTPS port published while disabled")
+	}
+	disabledHash := fingerprint(c)
+	c.Settings.HTTPSEnabled = new(true)
+	c.Settings.HTTPSPort = 8443
+	if err := Normalize(&c); err != nil {
+		t.Fatal(err)
+	}
+	if fingerprint(c) == disabledHash {
+		t.Fatal("HTTPS toggle did not mark gateway dirty")
+	}
+	raw, err = m.composeFile(c.Settings, m.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal(raw, &compose); err != nil {
+		t.Fatal(err)
+	}
+	if len(compose.Services["proxy"].Ports) != 2 {
+		t.Fatal("enabled HTTPS port not published")
+	}
+	c.Settings.DuckDNSEnabled = new(false)
+	c.Settings.DuckDomain = "home.duckdns.org"
+	c.Settings.DuckToken = "saved-token"
+	c.Settings.DDNS = true
+	if err := Normalize(&c); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.validateIssue(c.Hosts[0], c.Settings); err == nil {
+		t.Fatal("certificate issued while DuckDNS disabled")
+	}
+	saved, err := m.Save(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Settings.DuckDomain != "home.duckdns.org" || !saved.Settings.TokenSet {
+		t.Fatal("disabling DuckDNS lost configuration")
+	}
+	if _, err := m.Enqueue("dns", "", "fixture"); err == nil {
+		t.Fatal("manual DNS update accepted while disabled")
+	}
+	if _, err := m.Enqueue("certificate", c.Hosts[0].ID, "fixture"); err == nil {
+		t.Fatal("certificate job accepted while disabled")
+	}
+	if err := m.DB.Setting("proxy_active", c); err != nil {
+		t.Fatal(err)
+	}
+	m.maintain()
+	var jobs int
+	if err := m.DB.QueryRow("SELECT count(*) FROM proxy_jobs").Scan(&jobs); err != nil || jobs != 0 {
+		t.Fatal("disabled feature queued automatic jobs")
+	}
+	saved.Settings.DuckDNSEnabled = new(true)
+	saved.Settings.AgreeTerms = true
+	restored, err := m.Save(saved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !restored.Settings.TokenSet || !restored.Settings.DuckDNSOn() {
+		t.Fatal("re-enabling lost saved token")
+	}
+	c.Settings.HTTPSEnabled = new(false)
+	c.Settings.DuckDNSEnabled = new(true)
+	if err := m.validateIssue(c.Hosts[0], c.Settings); err == nil {
+		t.Fatal("certificate issued while HTTPS disabled")
+	}
+}
+
+func TestGatewayLegacyConfigurationAndNewDefaults(t *testing.T) {
+	m := setup(t, &fakeRunner{})
+	fresh, err := m.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh.Settings.HTTPSOn() || fresh.Settings.DuckDNSOn() {
+		t.Fatal("new configuration should require opt-in")
+	}
+	legacy := fixture()
+	legacy.Settings.HTTPSEnabled = nil
+	legacy.Settings.DuckDNSEnabled = nil
+	legacy.Settings.DuckDomain = "home.duckdns.org"
+	if err := m.DB.Setting("proxy_config", legacy); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.DB.Setting("proxy_active", legacy); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := m.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !loaded.Settings.HTTPSOn() || !loaded.Settings.DuckDNSOn() {
+		t.Fatal("legacy configured features unexpectedly disabled")
+	}
+	active, err := m.readConfig("proxy_active")
+	if err != nil || !active.Settings.HTTPSOn() || !active.Settings.DuckDNSOn() {
+		t.Fatal("legacy applied snapshot changed behavior")
+	}
 }

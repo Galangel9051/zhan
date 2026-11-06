@@ -219,7 +219,7 @@ func (s *Server) validateConfiguration(ctx context.Context, b *configurationBack
 	if revision != after {
 		return nil, preview, database.ErrConfigurationChanged
 	}
-	preview.Revision, preview.ProxyHosts, preview.Retention, preview.SMTPEnabled = revision, len(b.Proxy.Hosts), b.System.Retention, b.SMTP.Host != ""
+	preview.Revision, preview.ProxyHosts, preview.Retention, preview.SMTPEnabled = revision, len(b.Proxy.Hosts), b.System.Retention, b.SMTP.Host != "" && (b.SMTP.Enabled == nil || *b.SMTP.Enabled)
 	return projects, preview, nil
 }
 
