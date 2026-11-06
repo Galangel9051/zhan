@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 // Retain the outgoing dialog briefly so close/cancel has an exit transition too.
 export function Presence({ children }: { children: ReactNode }) {
@@ -35,4 +35,25 @@ export function useDialogScrollLock() {
   if (dialogLocks++ === 0) { previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden' }
   return () => { if (--dialogLocks === 0) document.body.style.overflow = previousOverflow }
  }, [])
+}
+
+// Keep closing table rows mounted, and give new rows a collapsed frame before
+// opening. Cancel stale frames/timers when the user reverses direction quickly.
+export function useAnimatedKeys(open: Set<string>) {
+ const [present, setPresent] = useState(() => new Set(open))
+ const [visible, setVisible] = useState(() => new Set(open))
+ useLayoutEffect(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+   setPresent(new Set(open)); setVisible(new Set(open)); return
+  }
+  setPresent(previous => new Set([...previous, ...open]))
+  setVisible(previous => new Set([...previous].filter(key => open.has(key))))
+  let secondFrame = 0
+  const firstFrame = requestAnimationFrame(() => {
+   secondFrame = requestAnimationFrame(() => setVisible(new Set(open)))
+  })
+  const timer = window.setTimeout(() => setPresent(new Set(open)), 300)
+  return () => { cancelAnimationFrame(firstFrame); cancelAnimationFrame(secondFrame); window.clearTimeout(timer) }
+ }, [open])
+ return { present, visible }
 }
