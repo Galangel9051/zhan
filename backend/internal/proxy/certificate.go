@@ -27,6 +27,12 @@ import (
 const stagingURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
 
 func (m *Manager) validateIssue(h Host, s Settings) error {
+	if !s.HTTPSOn() {
+		return errors.New("请先启用网关 HTTPS")
+	}
+	if !s.DuckDNSOn() {
+		return errors.New("请先启用 DuckDNS 与免费证书")
+	}
 	if s.DuckDomain == "" || s.DuckToken == "" {
 		return errors.New("请先保存 DuckDNS 主域名与 Token")
 	}

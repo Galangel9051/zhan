@@ -15,17 +15,19 @@ import (
 )
 
 type Settings struct {
-	Bind       string `json:"bind"`
-	HTTPPort   int    `json:"http_port"`
-	HTTPSPort  int    `json:"https_port"`
-	DuckDomain string `json:"duck_domain"`
-	DuckIP     string `json:"duck_ip"`
-	DuckToken  string `json:"duck_token,omitempty"`
-	TokenSet   bool   `json:"token_set"`
-	Email      string `json:"email"`
-	AgreeTerms bool   `json:"agree_terms"`
-	Staging    bool   `json:"staging"`
-	DDNS       bool   `json:"ddns"`
+	HTTPSEnabled   *bool  `json:"https_enabled,omitempty"`
+	DuckDNSEnabled *bool  `json:"duckdns_enabled,omitempty"`
+	Bind           string `json:"bind"`
+	HTTPPort       int    `json:"http_port"`
+	HTTPSPort      int    `json:"https_port"`
+	DuckDomain     string `json:"duck_domain"`
+	DuckIP         string `json:"duck_ip"`
+	DuckToken      string `json:"duck_token,omitempty"`
+	TokenSet       bool   `json:"token_set"`
+	Email          string `json:"email"`
+	AgreeTerms     bool   `json:"agree_terms"`
+	Staging        bool   `json:"staging"`
+	DDNS           bool   `json:"ddns"`
 }
 type Host struct {
 	ID          string `json:"id"`
@@ -49,27 +51,39 @@ var domainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:
 var idPattern = regexp.MustCompile(`^[a-f0-9]{16}$`)
 
 func Defaults() Config {
-	return Config{Settings: Settings{Bind: "0.0.0.0", HTTPPort: 80, HTTPSPort: 443}, Hosts: []Host{}}
+	return Config{Settings: Settings{Bind: "0.0.0.0", HTTPPort: 80, HTTPSPort: 443, HTTPSEnabled: new(false), DuckDNSEnabled: new(false)}, Hosts: []Host{}}
+}
+
+// Missing flags retain the behavior of configurations saved before the switches.
+func (s Settings) HTTPSOn() bool { return s.HTTPSEnabled == nil || *s.HTTPSEnabled }
+func (s Settings) DuckDNSOn() bool {
+	if s.DuckDNSEnabled == nil {
+		return s.DuckDomain != ""
+	}
+	return *s.DuckDNSEnabled
 }
 func Normalize(c *Config) error {
 	s := &c.Settings
 	if net.ParseIP(s.Bind) == nil {
 		return fmt.Errorf("监听地址必须是 IP，例如 127.0.0.1 或 0.0.0.0")
 	}
-	if s.HTTPPort < 1 || s.HTTPPort > 65535 || s.HTTPSPort < 1 || s.HTTPSPort > 65535 || s.HTTPPort == s.HTTPSPort {
+	if s.HTTPPort < 1 || s.HTTPPort > 65535 || (s.HTTPSOn() && (s.HTTPSPort < 1 || s.HTTPSPort > 65535 || s.HTTPPort == s.HTTPSPort)) {
 		return fmt.Errorf("HTTP / HTTPS 端口应为不同的 1–65535 整数")
 	}
 	s.DuckDomain = strings.ToLower(strings.TrimSpace(s.DuckDomain))
-	if s.DuckDomain != "" && (!domainPattern.MatchString(s.DuckDomain) || !strings.HasSuffix(s.DuckDomain, ".duckdns.org") || strings.Count(s.DuckDomain, ".") != 2) {
-		return fmt.Errorf("DuckDNS 主域名应为已注册的 name.duckdns.org")
-	}
-	if s.DuckIP != "" && net.ParseIP(s.DuckIP) == nil {
-		return fmt.Errorf("DuckDNS IP 必须为 IPv4 或 IPv6；留空自动检测公网 IPv4")
-	}
-	if s.DDNS && s.DuckDomain == "" {
+	if s.DuckDNSEnabled != nil && *s.DuckDNSEnabled && s.DuckDomain == "" {
 		return fmt.Errorf("请先填写 DuckDNS 主域名")
 	}
-	if s.Email != "" {
+	if s.DuckDNSOn() && s.DuckDomain != "" && (!domainPattern.MatchString(s.DuckDomain) || !strings.HasSuffix(s.DuckDomain, ".duckdns.org") || strings.Count(s.DuckDomain, ".") != 2) {
+		return fmt.Errorf("DuckDNS 主域名应为已注册的 name.duckdns.org")
+	}
+	if s.DuckDNSOn() && s.DuckIP != "" && net.ParseIP(s.DuckIP) == nil {
+		return fmt.Errorf("DuckDNS IP 必须为 IPv4 或 IPv6；留空自动检测公网 IPv4")
+	}
+	if s.DuckDNSOn() && s.DDNS && s.DuckDomain == "" {
+		return fmt.Errorf("请先填写 DuckDNS 主域名")
+	}
+	if s.DuckDNSOn() && s.HTTPSOn() && s.Email != "" {
 		a, e := mail.ParseAddress(s.Email)
 		if e != nil || a.Address != s.Email {
 			return fmt.Errorf("证书联系邮箱格式不正确")
@@ -130,12 +144,16 @@ func fingerprint(c Config) string {
 		hosts[i].CertExpires = ""
 		hosts[i].CertError = ""
 	}
+	httpsPort := 0
+	if c.Settings.HTTPSOn() {
+		httpsPort = c.Settings.HTTPSPort
+	}
 	payload, _ := json.Marshal(struct {
 		Bind        string
 		HTTP, HTTPS int
 		Staging     bool
 		Hosts       []Host
-	}{c.Settings.Bind, c.Settings.HTTPPort, c.Settings.HTTPSPort, c.Settings.Staging, hosts})
+	}{c.Settings.Bind, c.Settings.HTTPPort, httpsPort, c.Settings.Staging, hosts})
 	return fmt.Sprintf("%x", sha256.Sum256(payload))
 }
 func Render(c Config) string {
@@ -146,7 +164,7 @@ func Render(c Config) string {
 			continue
 		}
 		fmt.Fprintf(&b, "  # %s\n  server {\n    listen 80;\n    server_name %s;\n", h.ID, h.Domain)
-		if h.HTTPS && h.Redirect {
+		if c.Settings.HTTPSOn() && h.HTTPS && h.Redirect {
 			port := ""
 			if c.Settings.HTTPSPort != 443 {
 				port = ":" + strconv.Itoa(c.Settings.HTTPSPort)
@@ -156,7 +174,7 @@ func Render(c Config) string {
 			location(&b, h)
 			b.WriteString("  }\n")
 		}
-		if h.HTTPS {
+		if c.Settings.HTTPSOn() && h.HTTPS {
 			fmt.Fprintf(&b, "  server {\n    listen 443 ssl;\n    server_name %s;\n    ssl_certificate /etc/nginx/certs/%s/fullchain.pem;\n    ssl_certificate_key /etc/nginx/certs/%s/privkey.pem;\n    ssl_protocols TLSv1.2 TLSv1.3;\n    ssl_session_cache shared:SSL:10m;\n", h.Domain, certName(h, c.Settings), certName(h, c.Settings))
 			location(&b, h)
 			b.WriteString("  }\n")
