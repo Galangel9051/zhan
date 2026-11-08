@@ -1,34 +1,36 @@
 package model
 
 type Stack struct {
-	ID           int64     `json:"id"`
-	Name         string    `json:"name"`
-	ProjectName  string    `json:"project_name"`
-	Directory    string    `json:"project_directory"`
-	Files        []string  `json:"compose_files"`
-	Desired      string    `json:"desired_state"`
-	CreatedAt    string    `json:"created_at"`
-	Repository   string    `json:"repository"`
-	Branch       string    `json:"branch"`
-	Polling      bool      `json:"polling_enabled"`
-	Interval     int       `json:"poll_interval"`
-	AutoDeploy   bool      `json:"auto_deploy"`
-	Notify       bool      `json:"notify_on_failure"`
-	NoCache      bool      `json:"no_cache"`
-	BuildPull    bool      `json:"build_pull"`
-	PullImages   bool      `json:"pull_images"`
-	Remote       string    `json:"remote_commit"`
-	Local        string    `json:"local_commit"`
-	Attempted    string    `json:"last_attempted_commit"`
-	Success      string    `json:"last_success_commit"`
-	Failures     int       `json:"failure_count"`
-	FailedCommit string    `json:"failed_commit"`
-	RetryAt      int64     `json:"retry_at"`
-	NextPoll     int64     `json:"next_poll_at"`
-	Runtime      string    `json:"runtime_status"`
-	Services     []Service `json:"services"`
-	LastTask     *Task     `json:"last_task,omitempty"`
-	RuntimeError string    `json:"runtime_error,omitempty"`
+	ID             int64     `json:"id"`
+	Name           string    `json:"name"`
+	ProjectName    string    `json:"project_name"`
+	Directory      string    `json:"project_directory"`
+	Files          []string  `json:"compose_files"`
+	Desired        string    `json:"desired_state"`
+	CreatedAt      string    `json:"created_at"`
+	Repository     string    `json:"repository"`
+	Branch         string    `json:"branch"`
+	Polling        bool      `json:"polling_enabled"`
+	Interval       int       `json:"poll_interval"`
+	AutoDeploy     bool      `json:"auto_deploy"`
+	Notify         bool      `json:"notify_on_failure"`
+	NoCache        bool      `json:"no_cache"`
+	BuildPull      bool      `json:"build_pull"`
+	PullImages     bool      `json:"pull_images"`
+	Remote         string    `json:"remote_commit"`
+	Local          string    `json:"local_commit"`
+	Attempted      string    `json:"last_attempted_commit"`
+	Success        string    `json:"last_success_commit"`
+	Failures       int       `json:"failure_count"`
+	FailedCommit   string    `json:"failed_commit"`
+	RetryAt        int64     `json:"retry_at"`
+	RetryType      string    `json:"retry_type"`
+	LastFailedTask int64     `json:"last_failed_task"`
+	NextPoll       int64     `json:"next_poll_at"`
+	Runtime        string    `json:"runtime_status"`
+	Services       []Service `json:"services"`
+	LastTask       *Task     `json:"last_task,omitempty"`
+	RuntimeError   string    `json:"runtime_error,omitempty"`
 }
 type Service struct {
 	Name         string      `json:"name"`
@@ -74,6 +76,9 @@ type Task struct {
 	CreatedAt       string `json:"created_at"`
 	StartedAt       string `json:"started_at"`
 	FinishedAt      string `json:"finished_at"`
+	// RetryOf is the failed task an automatic retry follows; 0 for tasks an
+	// operator, the poller, or a manual retry started.
+	RetryOf int64 `json:"retry_of"`
 }
 type SMTP struct {
 	Enabled     *bool    `json:"enabled,omitempty"`

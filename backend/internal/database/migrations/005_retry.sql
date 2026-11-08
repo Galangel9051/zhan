@@ -1,0 +1,3 @@
+ALTER TABLE tasks ADD COLUMN retry_of INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE deployment_configs ADD COLUMN retry_type TEXT NOT NULL DEFAULT '';
+ALTER TABLE deployment_configs ADD COLUMN retry_task_id INTEGER NOT NULL DEFAULT 0;

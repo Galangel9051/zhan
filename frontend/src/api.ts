@@ -3,17 +3,17 @@ export interface Container { id: string; name: string; service: string; state: s
 export interface ContainerStats { cpu_percent: number | null; memory_bytes: number | null; memory_limit: number | null; memory_percent: number | null; network_rx: number | null; network_tx: number | null; block_read: number | null; block_write: number | null; pids: number | null }
 export interface ResourceSnapshot { sampled_at: string; containers: Record<string, ContainerStats>; unavailable_count: number }
 export interface Service { name: string; image: string; build: boolean; dependencies: string[]; status: string; containers: Container[] }
-export interface Task { id: number; stack_id: number; stack_name: string; task_type: string; trigger_type: string; service: string; container_id: string; start_after_deploy: boolean; commit_sha: string; status: string; stage: string; exit_code: number; error_message: string; created_at: string; started_at: string; finished_at: string }
+export interface Task { id: number; stack_id: number; stack_name: string; task_type: string; trigger_type: string; service: string; container_id: string; start_after_deploy: boolean; commit_sha: string; status: string; stage: string; exit_code: number; error_message: string; created_at: string; started_at: string; finished_at: string; retry_of: number }
 export interface TaskPage { data: Task[]; pagination: { page: number; page_size: number; total: number; total_pages: number } }
 export interface Stack {
  id: number; name: string; project_name: string; project_directory: string; compose_files: string[]; desired_state: string; created_at: string;
  repository: string; branch: string; polling_enabled: boolean; poll_interval: number; auto_deploy: boolean; notify_on_failure: boolean; no_cache: boolean; build_pull: boolean; pull_images: boolean;
- remote_commit: string; local_commit: string; last_attempted_commit: string; last_success_commit: string; failure_count: number; failed_commit: string; retry_at: number; next_poll_at: number;
+ remote_commit: string; local_commit: string; last_attempted_commit: string; last_success_commit: string; failure_count: number; failed_commit: string; retry_at: number; retry_type: string; last_failed_task: number; next_poll_at: number;
  runtime_status: string; services: Service[]; last_task?: Task; runtime_error?: string;
 }
 export interface Discovery { name: string; status: string; config_files: string[] }
 export interface SMTP { enabled?: boolean; host: string; port: number; username: string; password?: string; password_set: boolean; tls_mode: string; from: string; recipients: string[]; stages: string[]; cooldown_minutes: number }
-export interface Settings { smtp: SMTP; allowed_roots: string[]; listen: string; workers: number; log_retention_days: number; max_log_mb: number; retry_delays_seconds: number[]; secure_cookies: boolean }
+export interface Settings { smtp: SMTP; allowed_roots: string[]; listen: string; workers: number; log_retention_days: number; max_log_mb: number; retry_delays_seconds: number[]; retry_base_seconds: number; retry_max_seconds: number; retry_max_attempts: number; secure_cookies: boolean }
 export interface GitKeyInfo { public_key: string; fingerprint: string; key_path: string; known_hosts_path: string; created_at: string; known_hosts_count: number }
 export interface GitTestResult { ok: boolean; host: string; message: string; hint: string; output: string }
 export interface Audit { id: number; user: string; action: string; target: string; result: string; created_at: string }

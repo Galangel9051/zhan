@@ -74,6 +74,7 @@ func (e *Engine) Start(ctx context.Context) error {
 				return
 			case <-ticker.C:
 				e.Poll()
+				e.RetryDue()
 			case <-cleanup.C:
 				e.cleanup()
 			}
@@ -254,7 +255,7 @@ func (e *Engine) execute(ctx context.Context, t *model.Task) {
 		}
 	}
 	if (t.Type == "deploy" || t.Type == "rebuild") && t.Status == "failed" {
-		e.recordFailure(stack, t.Commit)
+		e.recordFailure(stack, *t)
 	}
 	if err = e.DB.Finish(*t); err != nil {
 		log.Printf("task finish: %v", err)
@@ -413,7 +414,7 @@ func (e *Engine) run(ctx context.Context, t *model.Task, s *model.Stack, out io.
 		if s.Runtime != "running" {
 			return fmt.Errorf("健康检查未通过：%s", s.Runtime)
 		}
-		_, err = e.DB.Exec("UPDATE deployment_configs SET last_success_commit=?,failure_count=0,failed_commit='',retry_at=0 WHERE stack_id=?", t.Commit, s.ID)
+		_, err = e.DB.Exec("UPDATE deployment_configs SET last_success_commit=?,failure_count=0,failed_commit='',retry_at=0,retry_type='',retry_task_id=0 WHERE stack_id=?", t.Commit, s.ID)
 		if err != nil {
 			return err
 		}
@@ -427,22 +428,98 @@ func stringsTrim(v string) string {
 	}
 	return v
 }
-func (e *Engine) recordFailure(s model.Stack, commit string) {
+
+// recordFailure advances the backoff counter for a failed deployment and stores
+// the action that failed so the retry repeats the same operation instead of
+// being silently replaced by a plain pull.
+func (e *Engine) recordFailure(s model.Stack, failed model.Task) {
 	failures := s.Failures + 1
-	if s.FailedCommit != commit {
+	if s.FailedCommit != failed.Commit {
 		failures = 1
 	}
 	retry := int64(0)
-	if failures <= len(e.Config.RetryDelays) {
-		retry = time.Now().Unix() + int64(e.Config.RetryDelays[failures-1])
+	if delay, ok := e.Config.RetryDelay(failures); ok {
+		retry = time.Now().Unix() + int64(delay.Seconds())
 	}
-	_, _ = e.DB.Exec("UPDATE deployment_configs SET last_attempted_commit=?,failed_commit=?,failure_count=?,retry_at=? WHERE stack_id=?", commit, commit, failures, retry, s.ID)
+	_, _ = e.DB.Exec("UPDATE deployment_configs SET last_attempted_commit=?,failed_commit=?,failure_count=?,retry_at=?,retry_type=?,retry_task_id=? WHERE stack_id=?", failed.Commit, failed.Commit, failures, retry, retryTaskType(failed), failed.ID, s.ID)
+}
+
+// retryTaskType keeps the failed action. A rebuild never pulls, so retrying it
+// as a deploy would quietly change what the operator asked for. A deploy that
+// failed during build still re-pulls on retry, which also picks up a fix pushed
+// in the meantime.
+func retryTaskType(t model.Task) string {
+	if t.Type == "rebuild" {
+		return "rebuild"
+	}
+	return "deploy"
+}
+
+// retryTask builds the follow-up action for a project whose backoff expired.
+// When the remote branch already holds a newer commit, the retry pulls it first
+// so a fix pushed in the meantime is picked up; otherwise it repeats the action
+// that failed, which for a rebuild means the exact same working tree.
+func retryTask(s model.Stack) model.Task {
+	kind := s.RetryType
+	if kind != "rebuild" && kind != "deploy" {
+		kind = "deploy"
+	}
+	if s.Remote != "" && s.Remote != s.FailedCommit {
+		kind = "deploy"
+	}
+	return model.Task{StackID: s.ID, Type: kind, Trigger: "scheduled", RetryOf: s.LastFailedTask}
+}
+
+// RetryDue enqueues retries whose backoff has expired. It runs on the scheduler
+// tick, so a restart, a busy queue, or a cancelled retry cannot strand a failed
+// deployment. Enqueue admits one active task per stack, and moving retry_at
+// forward first stops two ticks from queueing the same attempt twice.
+func (e *Engine) RetryDue() {
+	items, err := e.DB.Stacks()
+	if err != nil {
+		return
+	}
+	now := time.Now().Unix()
+	for _, s := range items {
+		if s.Failures == 0 || s.RetryAt == 0 || s.RetryAt > now || s.Desired != "running" {
+			continue
+		}
+		delay, ok := e.Config.RetryDelay(s.Failures)
+		if !ok {
+			// Retry budget spent: stop rescheduling until a new commit arrives.
+			_, _ = e.DB.Exec("UPDATE deployment_configs SET retry_at=0 WHERE stack_id=?", s.ID)
+			continue
+		}
+		// Claim the slot first so two ticks cannot both enqueue this attempt. The
+		// conditional write also keeps a worker that finished in the meantime
+		// from having its newer retry_at overwritten.
+		claimed, err := e.DB.Exec("UPDATE deployment_configs SET retry_at=? WHERE stack_id=? AND retry_at=?", now+int64(delay.Seconds()), s.ID, s.RetryAt)
+		if err != nil {
+			continue
+		}
+		if n, err := claimed.RowsAffected(); err != nil || n == 0 {
+			continue
+		}
+		task := retryTask(s)
+		if err := e.Enqueue(&task); err != nil {
+			// Give the attempt back so the next tick retries it: a busy stack is
+			// only a temporary condition, and a rejected insert must not consume
+			// the retry budget.
+			_, _ = e.DB.Exec("UPDATE deployment_configs SET retry_at=? WHERE stack_id=?", s.RetryAt, s.ID)
+			if !errors.Is(err, database.ErrBusy) {
+				log.Printf("stack %d: retry not queued: %s", s.ID, command.CleanError(err))
+			}
+		}
+	}
 }
 func (e *Engine) maybeDeploy(id int64) {
 	s, err := e.DB.Stack(id)
 	if err != nil || !s.Polling || !s.AutoDeploy || s.Desired != "running" || s.Remote == "" || s.Remote == s.Success {
 		return
 	}
+	// A commit that already failed waits for its own backoff, which RetryDue
+	// enforces with the action that actually failed. A newer commit is a fresh
+	// attempt and is never held back by the old one.
 	if s.FailedCommit == s.Remote && s.Failures > 0 && (s.RetryAt == 0 || s.RetryAt > time.Now().Unix()) {
 		return
 	}

@@ -42,7 +42,7 @@
 - 首次启动自动生成专用 SSH 密钥，设置页复制公钥即可接入，无需挂载宿主机凭据
 - 拒绝脏工作区，只做 `merge --ff-only`，不执行 `reset --hard`
 - 分别记录远程、本地、最近尝试与最近成功的 Commit，失败不会误记成功
-- 按项目轮询自动部署，失败后 5/15 分钟退避重试，达到阈值暂停
+- 按项目轮询自动部署；构建或部署失败后按指数退避自动重试，重试会重复失败的操作，远程有新 Commit 时改为拉取并部署
 
 **任务与日志**
 
@@ -135,7 +135,10 @@ cd frontend && npm run dev
 | `task_timeout_minutes` | —                    | `30`              | 单个任务超时                   |
 | `log_retention_days`   | —                    | `30`              | 任务日志保留天数                 |
 | `max_log_mb`           | —                    | `20`              | 单个任务日志上限                 |
-| `retry_delays_seconds` | —                    | `[300, 900]`      | 失败后重试间隔                  |
+| `retry_base_seconds`   | —                    | `60`              | 首次失败后的等待时间               |
+| `retry_max_seconds`    | —                    | `3600`            | 指数退避的上限                    |
+| `retry_max_attempts`   | —                    | `5`               | 同一 Commit 最多自动重试次数        |
+| `retry_delays_seconds` | —                    | `[]`              | 填固定间隔列表可覆盖指数退避           |
 
 `allowed_roots` 使用系统路径分隔符（Linux / macOS 为冒号）。`.env` 不会自动加载。
 
@@ -204,7 +207,7 @@ configs/                        YAML 与 systemd 示例
 cd backend && go test -race ./...
 ```
 
-覆盖范围包括本地临时 Git 远程仓库、脏工作区保护、Commit 记账、失败构建不部署、停止期望状态、有限重试、任务取消互斥、SQLite 持久化恢复、路径与符号链接边界、认证与 CSRF、只读导入、SSE 与日志下载、SMTP 加密去重。自动测试使用模拟 Docker，不会操作现有业务项目。
+覆盖范围包括本地临时 Git 远程仓库、脏工作区保护、Commit 记账、失败构建不部署、停止期望状态、失败后按指数退避重试并保留失败动作、新 Commit 不受旧退避影响、任务取消互斥、SQLite 持久化恢复、路径与符号链接边界、认证与 CSRF、只读导入、SSE 与日志下载、SMTP 加密去重。自动测试使用模拟 Docker，不会操作现有业务项目。
 
 需要真实 Docker 的端到端验证只创建一个随机命名、无公开端口、无宿主机挂载的临时 Nginx 项目，结束后仅清理该测试项目（需预先准备 `nginx:stable-alpine` 镜像）：
 

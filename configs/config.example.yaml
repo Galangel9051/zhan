@@ -17,5 +17,12 @@ workers: 1
 task_timeout_minutes: 30
 log_retention_days: 30
 max_log_mb: 20
-# 初次失败后，最多再自动尝试两次。新 Commit 不受旧 Commit 的暂停影响。
-retry_delays_seconds: [300, 900]
+# 构建或部署失败后自动重试：首次等待 retry_base_seconds，之后每次翻倍，
+# 封顶 retry_max_seconds，最多重试 retry_max_attempts 次。
+# 重试会重复失败的操作（重新构建仍只重新构建）；如果远程已有更新的 Commit，
+# 则改为拉取并部署，以便拾取新提交的修复。新 Commit 不受旧 Commit 的退避影响。
+retry_base_seconds: 60
+retry_max_seconds: 3600
+retry_max_attempts: 5
+# 如需固定间隔而非指数退避，填这个列表（例如 [300, 900]）；一旦填写就忽略上面三项。
+retry_delays_seconds: []
