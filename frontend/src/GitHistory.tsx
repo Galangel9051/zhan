@@ -34,6 +34,6 @@ export default function GitHistory({ stack }: { stack: Stack }) {
    {!!missing.length && <div className="git-history-missing">{missing.map(marker => <p key={marker.kind}><span className={`git-version-tag is-${marker.kind}`}>{marker.label}</span><code title={marker.hash}>{short(marker.hash!)}</code><small>不在当前提交树内，可能尚未获取或超出显示范围</small></p>)}</div>}
    <p className="git-history-footnote">连线表示真实父提交关系。远程位置来自最近检查或本机记录；刷新提交树仅读取本地历史。需获取最新代码时，请执行“拉取代码”或“拉取并部署”。</p>
   </>}
-  {stack.failure_count > 0 && <div className="retry-info">连续失败 {stack.failure_count} 次 · {stack.retry_at ? `下次重试：${new Date(stack.retry_at * 1000).toLocaleString('zh-CN')}` : '自动重试已暂停，出现新 Commit 后恢复'}</div>}
+  {stack.failure_count > 0 && <div className="retry-info">连续失败 {stack.failure_count} 次 · {stack.retry_at ? `将在 ${new Date(stack.retry_at * 1000).toLocaleString('zh-CN')} 自动重试${stack.retry_type === 'rebuild' ? '重新构建' : '拉取并部署'}` : '自动重试次数已用尽，出现新 Commit 后恢复'}</div>}
  </section>
 }

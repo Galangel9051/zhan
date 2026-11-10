@@ -675,7 +675,7 @@ func (s *Server) settings(c *gin.Context) {
 	}
 	retention := s.Config.LogRetentionDays
 	_ = s.DB.GetSetting("log_retention_days", &retention)
-	c.JSON(200, gin.H{"data": gin.H{"smtp": smtp, "listen": s.Config.Listen, "allowed_roots": s.Config.AllowedRoots, "workers": s.Config.Workers, "log_retention_days": retention, "max_log_mb": s.Config.MaxLogMB, "retry_delays_seconds": s.Config.RetryDelays, "secure_cookies": s.Config.SecureCookies}})
+	c.JSON(200, gin.H{"data": gin.H{"smtp": smtp, "listen": s.Config.Listen, "allowed_roots": s.Config.AllowedRoots, "workers": s.Config.Workers, "log_retention_days": retention, "max_log_mb": s.Config.MaxLogMB, "retry_delays_seconds": s.Config.RetryDelays, "retry_base_seconds": s.Config.RetryBaseSeconds, "retry_max_seconds": s.Config.RetryMaxSeconds, "retry_max_attempts": s.Config.RetryMaxAttempts, "secure_cookies": s.Config.SecureCookies}})
 }
 func (s *Server) updateSettings(c *gin.Context) {
 	var input struct {
