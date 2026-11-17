@@ -52,6 +52,14 @@
 - 任务日志持久化，SSE 流式输出，支持游标续读与完整下载
 - 容器最近 N 行日志，过期自动清理
 
+**AI 自动运维**
+
+- OpenAI 兼容模型接口，API Key 加密保存
+- 手动、按间隔、每天定时和部署结果 / 自定义事件触发 AI 任务
+- 为每个任务指定工作区，独立授权文件读写与项目操作
+- 工具调用、模型输出与运行状态持久化，支持超时、取消和重启恢复
+- 使用说明见 [AI 自动运维](docs/ai-operations.md)
+
 **安全**
 
 - Argon2id 密码哈希、HttpOnly / SameSite Cookie、CSRF 校验、登录限流
@@ -177,6 +185,7 @@ Git 绑定使用现有的 `origin` 与当前分支。推荐为服务账户配置
 | Git  | `POST /stacks/:id/git/{check,pull}`、`GET /stacks/:id/git/status`、`PUT /stacks/:id/polling`            |
 | 任务   | `GET /tasks`、`GET /tasks/:id`、`POST /tasks/:id/{retry,cancel}`                                        |
 | 任务输出 | `GET /tasks/:id/logs`、`GET /tasks/:id/logs?download=1`、`GET /tasks/:id/stream`                        |
+| AI 运维 | `GET/PUT /ai/settings`、`GET/POST /ai/jobs`、`PUT /ai/jobs/:id`、`POST /ai/jobs/:id/run`、`GET /ai/runs`、`GET /ai/runs/:id`、`POST /ai/runs/:id/cancel`、`POST /ai/events` |
 | 设置   | `GET/PUT /settings`、`PUT /settings/smtp`、`POST /settings/smtp/test`、`GET /audit`、`GET /notifications` |
 | 目录浏览 | `GET /filesystem?path=/opt/projects&offset=0&limit=200&hidden=0`                                      |
 
@@ -186,6 +195,7 @@ Git 绑定使用现有的 `origin` 与当前分支。推荐为服务账户配置
 
 ```text
 backend/cmd/server/             程序入口、管理员初始化、进程锁
+backend/internal/aiops/         AI 模型、工具、定时与事件任务
 backend/internal/auth/          密码、Session、凭据加密
 backend/internal/database/      SQLite 存储与版本化迁移
 backend/internal/docker/        路径校验、项目发现、Compose 固定命令
@@ -218,6 +228,8 @@ ZHAN_DOCKER_INTEGRATION=1 go test -v ./internal/deploy -run TestRealDockerLifecy
 ```
 
 ## 文档
+
+- [AI 自动运维](docs/ai-operations.md)
 
 - [容器资源与自定义列](docs/container-resources.md)
 - [配置导入与导出](docs/configuration-backup.md)

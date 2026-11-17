@@ -22,20 +22,22 @@ import (
 )
 
 type Engine struct {
-	DB            *database.Store
-	Docker        *docker.Client
-	Config        config.Config
-	Notify        *notify.Notifier
-	mu            sync.Mutex
-	workspaces    sync.Map
-	cancels       map[int64]context.CancelFunc
-	wg            sync.WaitGroup
-	wake          chan struct{}
-	notifications chan model.Task
+	DB               *database.Store
+	Docker           *docker.Client
+	Config           config.Config
+	Notify           *notify.Notifier
+	mu               sync.Mutex
+	workspaceMu      sync.Mutex
+	activeWorkspaces map[string]bool
+	workspaceChanged chan struct{}
+	cancels          map[int64]context.CancelFunc
+	wg               sync.WaitGroup
+	wake             chan struct{}
+	notifications    chan model.Task
 }
 
 func New(db *database.Store, d *docker.Client, c config.Config, n *notify.Notifier) *Engine {
-	return &Engine{DB: db, Docker: d, Config: c, Notify: n, cancels: map[int64]context.CancelFunc{}, wake: make(chan struct{}, 1), notifications: make(chan model.Task, 64)}
+	return &Engine{DB: db, Docker: d, Config: c, Notify: n, activeWorkspaces: map[string]bool{}, workspaceChanged: make(chan struct{}), cancels: map[int64]context.CancelFunc{}, wake: make(chan struct{}, 1), notifications: make(chan model.Task, 64)}
 }
 func (e *Engine) Start(ctx context.Context) error {
 	if err := os.MkdirAll(filepath.Join(e.Config.DataDir, "logs"), 0700); err != nil {
@@ -100,6 +102,65 @@ func (e *Engine) Start(ctx context.Context) error {
 	return nil
 }
 func (e *Engine) Wait() { e.wg.Wait() }
+
+// WithWorkspace serializes AI edits with commands in overlapping workspace trees.
+func (e *Engine) WithWorkspace(ctx context.Context, path string, fn func() error) error {
+	unlock, err := e.lockWorkspace(ctx, path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return fn()
+}
+func workspaceContains(parent, child string) bool {
+	rel, err := filepath.Rel(parent, child)
+	return err == nil && (rel == "." || filepath.IsLocal(rel))
+}
+func (e *Engine) lockWorkspace(ctx context.Context, path string) (func(), error) {
+	real, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return nil, err
+	}
+	real, err = filepath.Abs(real)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		e.workspaceMu.Lock()
+		busy := false
+		for active := range e.activeWorkspaces {
+			if workspaceContains(active, real) || workspaceContains(real, active) {
+				busy = true
+				break
+			}
+		}
+		if !busy {
+			e.activeWorkspaces[real] = true
+			e.workspaceMu.Unlock()
+			return func() {
+				e.workspaceMu.Lock()
+				delete(e.activeWorkspaces, real)
+				close(e.workspaceChanged)
+				e.workspaceChanged = make(chan struct{})
+				e.workspaceMu.Unlock()
+			}, nil
+		}
+		changed := e.workspaceChanged
+		e.workspaceMu.Unlock()
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+
 func (e *Engine) Enqueue(t *model.Task) error {
 	if t.Trigger == "" {
 		t.Trigger = "manual"
@@ -121,7 +182,7 @@ func (e *Engine) Enqueue(t *model.Task) error {
 	if err = e.Docker.Validate(&stack); err != nil {
 		return err
 	}
-	if t.Trigger == "scheduled" && (t.Type == "deploy" || t.Type == "rebuild") && stack.Desired == "stopped" {
+	if (t.Trigger == "scheduled" || t.AIRunID > 0) && (t.Type == "deploy" || t.Type == "rebuild" || (t.AIRunID > 0 && (t.Type == "start" || t.Type == "restart"))) && stack.Desired == "stopped" {
 		return errors.New("项目已手动停止，暂停自动部署")
 	}
 	if err = e.DB.CreateTask(t); err != nil {
@@ -201,9 +262,14 @@ func (e *Engine) execute(ctx context.Context, t *model.Task) {
 		_ = e.DB.Finish(*t)
 		return
 	}
-	workspace, _ := e.workspaces.LoadOrStore(stack.Directory, &sync.Mutex{})
-	workspace.(*sync.Mutex).Lock()
-	defer workspace.(*sync.Mutex).Unlock()
+	unlock, err := e.lockWorkspace(ctx, stack.Directory)
+	if err != nil {
+		t.Status = "cancelled"
+		t.Error = err.Error()
+		_ = e.DB.Finish(*t)
+		return
+	}
+	defer unlock()
 	out, err := newLog(e.LogPath(t.ID), e.Config.MaxLogMB)
 	if err != nil {
 		t.Status = "failed"
@@ -254,7 +320,7 @@ func (e *Engine) execute(ctx context.Context, t *model.Task) {
 			_ = appendLog.Close()
 		}
 	}
-	if (t.Type == "deploy" || t.Type == "rebuild") && t.Status == "failed" {
+	if t.AIRunID == 0 && (t.Type == "deploy" || t.Type == "rebuild") && t.Status == "failed" {
 		e.recordFailure(stack, *t)
 	}
 	if err = e.DB.Finish(*t); err != nil {

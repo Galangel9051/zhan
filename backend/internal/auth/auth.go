@@ -51,7 +51,7 @@ func loadKey(db *database.Store, dir string) ([]byte, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		var count int
 		// Never create a new master key over credentials encrypted with a lost key.
-		if err := db.QueryRow(`SELECT (SELECT count(*) FROM credentials) + (SELECT count(*) FROM app_settings WHERE key LIKE 'proxy_acme_account_%')`).Scan(&count); err != nil {
+		if err := db.QueryRow(`SELECT (SELECT count(*) FROM credentials) + (SELECT count(*) FROM app_settings WHERE key LIKE 'proxy_acme_account_%' OR (key='ai_provider' AND coalesce(json_extract(value,'$.api_key'),'')!=''))`).Scan(&count); err != nil {
 			return nil, err
 		}
 		if count != 0 {

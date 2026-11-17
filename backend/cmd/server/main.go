@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"zhan/backend/internal/aiops"
 	"zhan/backend/internal/auth"
 	"zhan/backend/internal/command"
 	"zhan/backend/internal/config"
@@ -105,12 +106,17 @@ func run() error {
 	if err = engine.Start(workerCtx); err != nil {
 		return err
 	}
+	aiManager := aiops.New(db, authentication, d, engine)
+	if err = aiManager.Start(workerCtx); err != nil {
+		return err
+	}
+	defer func() { cancelWorkers(); aiManager.Wait() }()
 	proxyManager := proxy.New(db, authentication, runner, cfg.DataDir)
 	if err = proxyManager.Start(); err != nil {
 		return err
 	}
 	defer proxyManager.Close()
-	api := &httpapi.Server{Proxy: proxyManager, DB: db, Auth: authentication, Docker: d, Engine: engine, Notify: n, Git: gitKeys, Config: cfg}
+	api := &httpapi.Server{AI: aiManager, Proxy: proxyManager, DB: db, Auth: authentication, Docker: d, Engine: engine, Notify: n, Git: gitKeys, Config: cfg}
 	server := &http.Server{Addr: cfg.Listen, Handler: api.Router(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	failure := make(chan error, 1)
 	go func() {
@@ -130,6 +136,7 @@ func run() error {
 	if shutdownErr := server.Shutdown(shutdown); shutdownErr != nil {
 		_ = server.Close()
 	}
+	aiManager.Wait()
 	engine.Wait()
 	return err
 }

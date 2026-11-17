@@ -141,7 +141,7 @@ func TestPasswordMinimumSixCharacters(t *testing.T) {
 }
 
 func TestMasterKeyPermissionsAndLoss(t *testing.T) {
-	for _, encryptedSetting := range []string{"credential", "acme"} {
+	for _, encryptedSetting := range []string{"credential", "acme", "ai"} {
 		t.Run(encryptedSetting, func(t *testing.T) {
 			dir := t.TempDir()
 			db, err := database.Open(filepath.Join(dir, "db.sqlite"))
@@ -160,6 +160,8 @@ func TestMasterKeyPermissionsAndLoss(t *testing.T) {
 			}
 			if encryptedSetting == "credential" {
 				_, err = db.Exec("INSERT INTO credentials(name,ciphertext) VALUES('smtp_password',?)", encrypted)
+			} else if encryptedSetting == "ai" {
+				err = db.Setting("ai_provider", map[string]string{"api_key": encrypted})
 			} else {
 				err = db.Setting("proxy_acme_account_false", encrypted)
 			}

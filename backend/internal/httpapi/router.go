@@ -19,6 +19,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"zhan/backend/internal/aiops"
 	"zhan/backend/internal/auth"
 	"zhan/backend/internal/command"
 	"zhan/backend/internal/config"
@@ -33,6 +34,7 @@ import (
 )
 
 type Server struct {
+	AI         *aiops.Manager
 	DB         *database.Store
 	Auth       *auth.Auth
 	Docker     *docker.Client
@@ -100,6 +102,7 @@ func (s *Server) Router() *gin.Engine {
 	api.POST("/auth/login", s.login)
 	api.Use(s.session)
 	s.proxyRoutes(api)
+	s.aiRoutes(api)
 	api.GET("/auth/me", func(c *gin.Context) { c.JSON(200, gin.H{"data": user(c)}) })
 	api.POST("/auth/password", s.changePassword)
 	api.POST("/auth/logout", func(c *gin.Context) {

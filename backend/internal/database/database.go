@@ -174,11 +174,11 @@ func (s *Store) Audits() ([]model.Audit, error) {
 	return items, rows.Err()
 }
 
-const taskSelect = `SELECT t.id,t.stack_id,s.name,t.task_type,t.trigger_type,t.service,t.container_id,t.start_after_deploy,t.commit_sha,t.status,t.stage,t.exit_code,t.error_message,t.created_at,t.started_at,t.finished_at,t.cancel_requested,t.retry_of FROM tasks t JOIN compose_stacks s ON s.id=t.stack_id `
+const taskSelect = `SELECT t.id,t.stack_id,s.name,t.task_type,t.trigger_type,t.service,t.container_id,t.start_after_deploy,t.commit_sha,t.status,t.stage,t.exit_code,t.error_message,t.created_at,t.started_at,t.finished_at,t.cancel_requested,t.retry_of,t.ai_run_id FROM tasks t JOIN compose_stacks s ON s.id=t.stack_id `
 
 func scanTask(row scanner) (model.Task, error) {
 	var t model.Task
-	err := row.Scan(&t.ID, &t.StackID, &t.StackName, &t.Type, &t.Trigger, &t.Service, &t.Container, &t.StartAfter, &t.Commit, &t.Status, &t.Stage, &t.ExitCode, &t.Error, &t.CreatedAt, &t.StartedAt, &t.FinishedAt, &t.CancelRequested, &t.RetryOf)
+	err := row.Scan(&t.ID, &t.StackID, &t.StackName, &t.Type, &t.Trigger, &t.Service, &t.Container, &t.StartAfter, &t.Commit, &t.Status, &t.Stage, &t.ExitCode, &t.Error, &t.CreatedAt, &t.StartedAt, &t.FinishedAt, &t.CancelRequested, &t.RetryOf, &t.AIRunID)
 	return t, err
 }
 func (s *Store) Task(id int64) (model.Task, error) {
@@ -216,14 +216,14 @@ func (s *Store) Tasks(stack, before int64, limit int) ([]model.Task, error) {
 var ErrBusy = errors.New("该项目已有排队或执行中的任务")
 
 func (s *Store) CreateTask(t *model.Task) error {
-	query := "INSERT INTO tasks(stack_id,task_type,trigger_type,service,container_id,start_after_deploy,retry_of,status) VALUES(?,?,?,?,?,?,?,'pending')"
-	args := []any{t.StackID, t.Type, t.Trigger, t.Service, t.Container, t.StartAfter, t.RetryOf}
+	query := "INSERT INTO tasks(stack_id,task_type,trigger_type,service,container_id,start_after_deploy,retry_of,ai_run_id,status) VALUES(?,?,?,?,?,?,?,?,'pending')"
+	args := []any{t.StackID, t.Type, t.Trigger, t.Service, t.Container, t.StartAfter, t.RetryOf, t.AIRunID}
 	if t.Trigger == "scheduled" && t.RetryOf == 0 {
 		// Recheck in the insert itself, even if a scheduler read an older config
 		// immediately before a restore paused automation. An automatic retry is
 		// exempt: it repeats an operation that was already admitted, so a manual
 		// rebuild still retries when polling or auto deploy is off.
-		query = "INSERT INTO tasks(stack_id,task_type,trigger_type,service,container_id,start_after_deploy,retry_of,status) SELECT ?,?,?,?,?,?,?,'pending' FROM deployment_configs WHERE stack_id=? AND polling_enabled=1 AND (?='git_check' OR auto_deploy=1)"
+		query = "INSERT INTO tasks(stack_id,task_type,trigger_type,service,container_id,start_after_deploy,retry_of,ai_run_id,status) SELECT ?,?,?,?,?,?,?,?,'pending' FROM deployment_configs WHERE stack_id=? AND polling_enabled=1 AND (?='git_check' OR auto_deploy=1)"
 		args = append(args, t.StackID, t.Type)
 	}
 	result, err := s.Exec(query, args...)

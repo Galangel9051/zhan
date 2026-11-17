@@ -79,6 +79,7 @@ type Task struct {
 	// RetryOf is the failed task an automatic retry follows; 0 for tasks an
 	// operator, the poller, or a manual retry started.
 	RetryOf int64 `json:"retry_of"`
+	AIRunID int64 `json:"ai_run_id,omitempty"`
 }
 type SMTP struct {
 	Enabled     *bool    `json:"enabled,omitempty"`
