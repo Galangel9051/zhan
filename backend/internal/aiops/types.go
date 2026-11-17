@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -19,16 +18,18 @@ import (
 )
 
 type Settings struct {
-	Enabled bool   `json:"enabled"`
-	BaseURL string `json:"base_url"`
-	Model   string `json:"model"`
-	APIKey  string `json:"api_key,omitempty"`
-	KeySet  bool   `json:"key_set"`
+	Enabled bool          `json:"enabled"`
+	BaseURL string        `json:"base_url"`
+	Model   string        `json:"model"`
+	APIKey  string        `json:"api_key,omitempty"`
+	KeySet  bool          `json:"key_set"`
+	Models  []ModelConfig `json:"models"`
 }
 type Job struct {
 	ID           int64  `json:"id"`
 	Name         string `json:"name"`
 	Prompt       string `json:"prompt"`
+	Model        string `json:"model,omitempty"`
 	Workspace    string `json:"workspace"`
 	StackID      int64  `json:"stack_id"`
 	Enabled      bool   `json:"enabled"`
@@ -75,10 +76,13 @@ func (m *Manager) Settings(secret bool) (Settings, error) {
 	var s Settings
 	err := m.DB.GetSetting("ai_provider", &s)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Settings{BaseURL: "https://api.openai.com/v1"}, nil
+		return Settings{BaseURL: "https://api.openai.com/v1", Models: []ModelConfig{}}, nil
 	}
 	if err != nil {
 		return s, err
+	}
+	if err = normalizeModels(&s); err != nil {
+		return Settings{}, err
 	}
 	s.KeySet = s.APIKey != ""
 	if secret && s.KeySet {
@@ -89,13 +93,16 @@ func (m *Manager) Settings(secret bool) (Settings, error) {
 	return s, err
 }
 func (m *Manager) SaveSettings(s Settings) error {
-	u, err := url.Parse(s.BaseURL)
-	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return errors.New("请填写 HTTP(S) API 基础地址，不含凭据或查询参数")
+	if err := validateEndpoint(s.BaseURL); err != nil {
+		return err
 	}
-	if strings.TrimSpace(s.Model) == "" || len(s.Model) > 200 || len(s.APIKey) > 4096 {
-		return errors.New("请填写有效模型和 API Key")
+	if len(s.APIKey) > 4096 {
+		return errors.New("API Key 过长")
 	}
+	if err := normalizeModels(&s); err != nil {
+		return err
+	}
+	var err error
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var old Settings
@@ -103,6 +110,9 @@ func (m *Manager) SaveSettings(s Settings) error {
 		return err
 	}
 	if s.APIKey == "" {
+		if old.APIKey != "" && strings.TrimRight(s.BaseURL, "/") != strings.TrimRight(old.BaseURL, "/") {
+			return errors.New("接口地址已改变，请重新输入 API Key，避免将原密钥发送给其他服务")
+		}
 		s.APIKey = old.APIKey
 	} else if s.APIKey, err = m.Auth.Encrypt(s.APIKey); err != nil {
 		return err

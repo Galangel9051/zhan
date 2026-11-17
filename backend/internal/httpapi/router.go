@@ -66,6 +66,9 @@ func (s *Server) Router() *gin.Engine {
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			c.Header("Cache-Control", "no-store")
 			limit := int64(64 * 1024)
+			if c.Request.URL.Path == "/api/v1/ai/settings" {
+				limit = 256 * 1024
+			}
 			if c.Request.URL.Path == "/api/v1/settings/config/import" || c.Request.URL.Path == "/api/v1/settings/config/import/preview" {
 				limit = maxConfigurationBytes
 			}

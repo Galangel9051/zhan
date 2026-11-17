@@ -17,6 +17,15 @@ import (
 
 func (m *Manager) validate(j *Job) error {
 	j.Name = strings.TrimSpace(j.Name)
+	if j.Model != "" {
+		s, err := m.Settings(false)
+		if err != nil {
+			return err
+		}
+		if _, err = s.selectedModel(j.Model); err != nil {
+			return err
+		}
+	}
 	if j.Name == "" || len(j.Name) > 128 || strings.TrimSpace(j.Prompt) == "" || len(j.Prompt) > 16000 {
 		return errors.New("请填写任务名称及指令（最多 16000 字节）")
 	}

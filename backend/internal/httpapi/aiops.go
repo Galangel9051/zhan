@@ -1,8 +1,12 @@
 package httpapi
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
 	"zhan/backend/internal/aiops"
 )
 
@@ -30,6 +34,21 @@ func (s *Server) aiRoutes(api *gin.RouterGroup) {
 		}
 		v, e := s.AI.Settings(false)
 		respond(c, v, e)
+	})
+	ai.POST("/models/discover", func(c *gin.Context) {
+		var input aiops.Settings
+		if !bind(c, &input) {
+			return
+		}
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+		defer cancel()
+		models, err := s.AI.DiscoverModels(ctx, input)
+		s.DB.Audit(user(c).Username, "ai_models_discover", "system", result(err))
+		if err != nil {
+			fail(c, 400, err.Error())
+			return
+		}
+		c.JSON(200, gin.H{"data": models})
 	})
 	ai.GET("/jobs", func(c *gin.Context) { v, e := s.AI.Jobs(); respond(c, v, e) })
 	save := func(c *gin.Context) {

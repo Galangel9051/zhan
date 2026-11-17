@@ -59,6 +59,8 @@ func TestAIAuthenticationCSRFAndLifecycle(t *testing.T) {
 	}
 	call("GET", "/settings", nil, false, false, 401)
 	call("PUT", "/settings", map[string]any{}, true, false, 403)
+	call("POST", "/models/discover", map[string]any{}, true, false, 403)
+	call("POST", "/models/discover", map[string]any{"base_url": "file:///etc"}, true, true, 400)
 	call("PUT", "/settings", aiops.Settings{Enabled: true, BaseURL: "http://localhost:9999/v1", Model: "fixture", APIKey: "test-secret"}, true, true, 200)
 	safe := call("GET", "/settings", nil, true, false, 200)
 	if bytes.Contains(safe, []byte("test-secret")) {
