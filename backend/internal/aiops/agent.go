@@ -121,7 +121,11 @@ func (m *Manager) work(parent context.Context) {
 	if err != nil {
 		return
 	}
-	err = m.Engine.WithWorkspace(ctx, r.Config.Workspace, func() error { return m.execute(ctx, &r) })
+	if r.Config.Engine == "pi" {
+		err = m.executePi(ctx, &r)
+	} else {
+		err = m.Engine.WithWorkspace(ctx, r.Config.Workspace, func() error { return m.execute(ctx, &r) })
+	}
 	status, errText := "success", ""
 	if err != nil {
 		status = "failed"

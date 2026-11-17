@@ -17,9 +17,19 @@ COPY backend/ ./
 COPY --from=frontend /src/frontend/dist/ ./internal/webui/dist/
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/zhan ./cmd/server
 
-# Official CLI image includes Docker Compose and Buildx; use the host daemon.
-FROM docker:29-cli
+FROM node:24-alpine AS pi
+WORKDIR /opt/zhan-pi
+COPY pi/package.json pi/package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY pi/bridge.mjs ./
+
+# Keep Node and its runtime libraries together; use the official host Docker CLI.
+FROM docker:29-cli AS dockercli
+FROM node:24-alpine
 RUN apk add --no-cache ca-certificates git openssh-client tzdata
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=dockercli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
+COPY --from=pi /opt/zhan-pi /opt/zhan-pi
 WORKDIR /app
 COPY --from=backend /out/zhan /usr/local/bin/zhan
 ENV ZHAN_LISTEN=0.0.0.0:12345

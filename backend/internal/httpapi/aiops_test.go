@@ -58,6 +58,12 @@ func TestAIAuthenticationCSRFAndLifecycle(t *testing.T) {
 		return w.Body.Bytes()
 	}
 	call("GET", "/settings", nil, false, false, 401)
+	call("GET", "/clash", nil, false, false, 401)
+	call("PUT", "/clash", map[string]any{}, true, false, 403)
+	call("PUT", "/clash", aiops.ClashSettings{BaseURL: "http://localhost:9090", Secret: "controller-secret", Groups: []string{"PROXY"}}, true, true, 200)
+	if bytes.Contains(call("GET", "/clash", nil, true, false, 200), []byte("controller-secret")) {
+		t.Fatal("Clash API leaked key")
+	}
 	call("PUT", "/settings", map[string]any{}, true, false, 403)
 	call("POST", "/models/discover", map[string]any{}, true, false, 403)
 	call("POST", "/models/discover", map[string]any{"base_url": "file:///etc"}, true, true, 400)

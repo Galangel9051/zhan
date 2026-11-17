@@ -26,23 +26,28 @@ type Settings struct {
 	Models  []ModelConfig `json:"models"`
 }
 type Job struct {
-	ID           int64  `json:"id"`
-	Name         string `json:"name"`
-	Prompt       string `json:"prompt"`
-	Model        string `json:"model,omitempty"`
-	Workspace    string `json:"workspace"`
-	StackID      int64  `json:"stack_id"`
-	Enabled      bool   `json:"enabled"`
-	Writable     bool   `json:"writable"`
-	AllowActions bool   `json:"allow_actions"`
-	Schedule     string `json:"schedule"` // manual, interval, daily, event
-	Interval     int    `json:"interval_seconds"`
-	DailyAt      string `json:"daily_at"`
-	Timezone     string `json:"timezone"`
-	EventName    string `json:"event_name"`
-	Timeout      int    `json:"timeout_seconds"`
-	MaxSteps     int    `json:"max_steps"`
-	NextRun      int64  `json:"next_run"`
+	Engine        string `json:"engine"`
+	AllowCommands bool   `json:"allow_commands"`
+	AllowNetwork  bool   `json:"allow_network"`
+	AllowClash    bool   `json:"allow_clash"`
+	TestImage     string `json:"test_image"`
+	ID            int64  `json:"id"`
+	Name          string `json:"name"`
+	Prompt        string `json:"prompt"`
+	Model         string `json:"model,omitempty"`
+	Workspace     string `json:"workspace"`
+	StackID       int64  `json:"stack_id"`
+	Enabled       bool   `json:"enabled"`
+	Writable      bool   `json:"writable"`
+	AllowActions  bool   `json:"allow_actions"`
+	Schedule      string `json:"schedule"` // manual, interval, daily, event
+	Interval      int    `json:"interval_seconds"`
+	DailyAt       string `json:"daily_at"`
+	Timezone      string `json:"timezone"`
+	EventName     string `json:"event_name"`
+	Timeout       int    `json:"timeout_seconds"`
+	MaxSteps      int    `json:"max_steps"`
+	NextRun       int64  `json:"next_run"`
 }
 type Run struct {
 	ID       int64  `json:"id"`

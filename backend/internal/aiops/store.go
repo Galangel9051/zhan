@@ -16,6 +16,18 @@ import (
 )
 
 func (m *Manager) validate(j *Job) error {
+	if j.Engine != "" && j.Engine != "native" && j.Engine != "pi" {
+		return errors.New("未知 AI 执行引擎")
+	}
+	if (j.AllowCommands || j.AllowClash) && j.Engine != "pi" {
+		return errors.New("命令和 Clash 工具需要 Pi 引擎")
+	}
+	if j.TestImage == "" {
+		j.TestImage = "python:3.13-alpine"
+	}
+	if strings.ContainsAny(j.TestImage, " \t\r\n") || strings.HasPrefix(j.TestImage, "-") {
+		return errors.New("无效测试镜像")
+	}
 	j.Name = strings.TrimSpace(j.Name)
 	if j.Model != "" {
 		s, err := m.Settings(false)

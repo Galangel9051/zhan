@@ -148,6 +148,18 @@ func TestAuthenticatedImportTaskLogsAndSettings(t *testing.T) {
 		t.Fatal("SMTP password returned")
 	}
 	data = call("GET", "/settings", nil, 200, "", "")
+	var settingsResponse struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(data, &settingsResponse); err != nil {
+		t.Fatal(err)
+	}
+	if string(settingsResponse.Data["retry_delays_seconds"]) != "[]" {
+		t.Fatalf("unset retry delays must be an array: %s", data)
+	}
+	if string(settingsResponse.Data["allowed_roots"]) == "null" {
+		t.Fatalf("allowed roots must be an array: %s", data)
+	}
 	if strings.Contains(string(data), smtp.Password) || !strings.Contains(string(data), `"password_set":true`) {
 		t.Fatal("bad password masking")
 	}
@@ -247,4 +259,14 @@ func TestBootstrapPasswordGate(t *testing.T) {
 		t.Fatal("password gate remained after change")
 	}
 	call("GET", "/tasks", nil, 200, "")
+	// An established account can change its password again from Settings.
+	csrf = session.Data.CSRF
+	password = map[string]string{"current_password": "incorrect", "new_password": "second-password", "confirm_password": "second-password"}
+	call("POST", "/auth/password", password, 400, csrf)
+	call("GET", "/auth/me", nil, 200, "")
+	password["current_password"] = "abcdef"
+	call("POST", "/auth/password", password, 204, csrf)
+	call("GET", "/auth/me", nil, 401, "")
+	call("POST", "/auth/login", map[string]string{"username": "admin", "password": "abcdef"}, 401, "")
+	call("POST", "/auth/login", map[string]string{"username": "admin", "password": "second-password"}, 200, "")
 }
