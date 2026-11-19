@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -56,56 +54,33 @@ func TestPiCommandPermissionsAndIsolation(t *testing.T) {
 		t.Fatal("authorized capabilities not applied")
 	}
 }
-func TestClashAuthorizationEncryptionAndOperations(t *testing.T) {
+
+func TestLegacyControllerPermissionDoesNotExposeRemovedTool(t *testing.T) {
 	m, j := fixture(t)
-	var selected string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer clash-secret" {
-			t.Error("missing auth")
-		}
-		switch {
-		case r.Method == "PUT" && r.URL.Path == "/proxies/PROXY":
-			var b struct {
-				Name string `json:"name"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&b)
-			selected = b.Name
-			w.WriteHeader(204)
-		case strings.HasSuffix(r.URL.Path, "/delay"):
-			_, _ = io.WriteString(w, `{"delay":12}`)
-		default:
-			_, _ = io.WriteString(w, `{"proxies":{"PROXY":{"now":"bad","all":["bad","good"]}}}`)
-		}
-	}))
-	defer server.Close()
-	if err := m.SaveClash(ClashSettings{BaseURL: server.URL, Secret: "clash-secret", Groups: []string{"PROXY"}}); err != nil {
+	raw, err := json.Marshal(j)
+	if err != nil {
 		t.Fatal(err)
 	}
-	safe, _ := m.ClashSettings(false)
-	if safe.Secret != "" || !safe.SecretSet {
-		t.Fatal("secret exposed")
+	var legacy map[string]any
+	if err := json.Unmarshal(raw, &legacy); err != nil {
+		t.Fatal(err)
 	}
-	var stored ClashSettings
-	_ = m.DB.GetSetting("ai_clash", &stored)
-	if stored.Secret == "clash-secret" {
-		t.Fatal("unencrypted secret")
+	legacy["allow_clash"] = true
+	raw, err = json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := m.clashTool(context.Background(), j, json.RawMessage(`{"operation":"inspect"}`)); err == nil {
-		t.Fatal("unauthorized access")
+	if err := json.Unmarshal(raw, &j); err != nil {
+		t.Fatal(err)
 	}
-	j.AllowClash = true
-	for _, args := range []string{`{"operation":"inspect"}`, `{"operation":"delay","node":"good"}`, `{"operation":"select","group":"PROXY","node":"good"}`} {
-		if _, err := m.clashTool(context.Background(), j, json.RawMessage(args)); err != nil {
-			t.Fatal(err)
+	for _, item := range toolsFor(j) {
+		function := item.(map[string]any)["function"].(map[string]any)
+		if function["name"] == "clash" {
+			t.Fatal("legacy permission exposed removed tool")
 		}
 	}
-	if selected != "good" {
-		t.Fatal("selection not applied")
-	}
-	if _, err := m.clashTool(context.Background(), j, json.RawMessage(`{"operation":"select","group":"other","node":"bad"}`)); err == nil {
-		t.Fatal("unapproved group accepted")
-	}
-	if err := m.SaveClash(ClashSettings{BaseURL: server.URL + "/other"}); err == nil {
-		t.Fatal("secret reused for changed endpoint")
+	used := false
+	if _, err := m.callTool(t.Context(), j, 0, nil, toolCallFrom("clash", `{}`), &used); err == nil {
+		t.Fatal("removed tool was executable")
 	}
 }

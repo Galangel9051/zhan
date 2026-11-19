@@ -29,7 +29,6 @@ type Job struct {
 	Engine        string `json:"engine"`
 	AllowCommands bool   `json:"allow_commands"`
 	AllowNetwork  bool   `json:"allow_network"`
-	AllowClash    bool   `json:"allow_clash"`
 	TestImage     string `json:"test_image"`
 	ID            int64  `json:"id"`
 	Name          string `json:"name"`

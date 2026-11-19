@@ -48,7 +48,7 @@ def main():
     job = api('POST', '/ai/jobs', {
         'engine': 'pi', 'name': project, 'prompt': '项目构建失败。请自主检查关联项目状态和最近任务日志，检查工作区代码并运行现有测试，修复根本问题。不要删除或弱化测试，不要绕过 Dockerfile 的测试步骤。修复后通过 stack_action rebuild 重新构建部署，验证真实成功再报告。',
         'workspace': workspace, 'stack_id': stack['id'], 'enabled': True, 'writable': True,
-        'allow_actions': True, 'allow_commands': True, 'allow_network': False, 'allow_clash': False,
+        'allow_actions': True, 'allow_commands': True, 'allow_network': False,
         'test_image': 'python:3.13-alpine', 'schedule': 'event', 'event_name': 'task.failed',
         'timeout_seconds': 300, 'max_steps': 25
     })

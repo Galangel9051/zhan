@@ -20,22 +20,8 @@ func (s *Server) aiRoutes(api *gin.RouterGroup) {
 		}
 		c.Next()
 	})
+	ai.GET("/events/catalog", func(c *gin.Context) { c.JSON(200, gin.H{"data": aiops.EventDefinitions()}) })
 	ai.GET("/settings", func(c *gin.Context) { v, e := s.AI.Settings(false); respond(c, v, e) })
-	ai.GET("/clash", func(c *gin.Context) { v, e := s.AI.ClashSettings(false); respond(c, v, e) })
-	ai.PUT("/clash", func(c *gin.Context) {
-		var input aiops.ClashSettings
-		if !bind(c, &input) {
-			return
-		}
-		err := s.AI.SaveClash(input)
-		s.DB.Audit(user(c).Username, "ai_clash_settings", "system", result(err))
-		if err != nil {
-			fail(c, 400, err.Error())
-			return
-		}
-		v, e := s.AI.ClashSettings(false)
-		respond(c, v, e)
-	})
 	ai.PUT("/settings", func(c *gin.Context) {
 		var input aiops.Settings
 		if !bind(c, &input) {

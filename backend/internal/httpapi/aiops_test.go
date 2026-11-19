@@ -57,13 +57,17 @@ func TestAIAuthenticationCSRFAndLifecycle(t *testing.T) {
 		}
 		return w.Body.Bytes()
 	}
-	call("GET", "/settings", nil, false, false, 401)
-	call("GET", "/clash", nil, false, false, 401)
-	call("PUT", "/clash", map[string]any{}, true, false, 403)
-	call("PUT", "/clash", aiops.ClashSettings{BaseURL: "http://localhost:9090", Secret: "controller-secret", Groups: []string{"PROXY"}}, true, true, 200)
-	if bytes.Contains(call("GET", "/clash", nil, true, false, 200), []byte("controller-secret")) {
-		t.Fatal("Clash API leaked key")
+	call("GET", "/events/catalog", nil, false, false, 401)
+	var catalog struct {
+		Data []aiops.EventDefinition `json:"data"`
 	}
+	if err := json.Unmarshal(call("GET", "/events/catalog", nil, true, false, 200), &catalog); err != nil || len(catalog.Data) != 26 {
+		t.Fatalf("invalid event catalog: %v", err)
+	}
+	call("GET", "/settings", nil, false, false, 401)
+	// Removed controller routes must remain unavailable.
+	call("GET", "/clash", nil, true, false, 404)
+	call("PUT", "/clash", map[string]any{}, true, true, 404)
 	call("PUT", "/settings", map[string]any{}, true, false, 403)
 	call("POST", "/models/discover", map[string]any{}, true, false, 403)
 	call("POST", "/models/discover", map[string]any{"base_url": "file:///etc"}, true, true, 400)

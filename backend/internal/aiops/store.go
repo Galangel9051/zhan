@@ -19,8 +19,8 @@ func (m *Manager) validate(j *Job) error {
 	if j.Engine != "" && j.Engine != "native" && j.Engine != "pi" {
 		return errors.New("未知 AI 执行引擎")
 	}
-	if (j.AllowCommands || j.AllowClash) && j.Engine != "pi" {
-		return errors.New("命令和 Clash 工具需要 Pi 引擎")
+	if j.AllowCommands && j.Engine != "pi" {
+		return errors.New("命令工具需要 Pi 引擎")
 	}
 	if j.TestImage == "" {
 		j.TestImage = "python:3.13-alpine"
@@ -90,8 +90,8 @@ func (m *Manager) validate(j *Job) error {
 			return errors.New("无效时区")
 		}
 	case "event":
-		if j.EventName == "" || len(j.EventName) > 100 {
-			return errors.New("请填写事件名")
+		if !validEvent(j.EventName) {
+			return errors.New("请选择内置事件或填写有效自定义事件名（字母、数字、点、下划线或连字符）")
 		}
 	default:
 		return errors.New("无效触发方式")
@@ -258,8 +258,8 @@ func (m *Manager) Runs(before int64) ([]Run, error) {
 	return runs, rows.Err()
 }
 func (m *Manager) Emit(name string, stackID int64, payload string) error {
-	if name == "" || len(name) > 100 || strings.HasPrefix(name, "task.") || len(payload) > 16000 || stackID < 0 {
-		return errors.New("自定义事件名无效或内容过长；task.* 为内置事件")
+	if !validEvent(name) || reservedEvent(name) || len(payload) > 16000 || stackID < 0 {
+		return errors.New("自定义事件名无效或内容过长；task/deploy/rebuild/git/project/service/container.* 为内置事件")
 	}
 	if stackID > 0 {
 		if _, err := m.DB.Stack(stackID); err != nil {
