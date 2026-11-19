@@ -146,7 +146,7 @@ func (m *Manager) SaveJob(j *Job) error {
 		if n > 0 {
 			return errors.New("任务正在排队或执行，请先取消后修改")
 		}
-		res, e := tx.Exec("UPDATE ai_jobs SET config=?,enabled=?,next_run=?,event_cursor=? WHERE id=?", string(data), j.Enabled, j.NextRun, cursor, j.ID)
+		res, e := tx.Exec("UPDATE ai_jobs SET config=?,enabled=?,next_run=?,event_cursor=? WHERE id=? AND deleted=0", string(data), j.Enabled, j.NextRun, cursor, j.ID)
 		if e != nil {
 			return e
 		}
@@ -163,8 +163,36 @@ func (m *Manager) SaveJob(j *Job) error {
 	}
 	return tx.Commit()
 }
+
+// Keep execution history while removing the definition from scheduling and editing.
+func (m *Manager) DeleteJob(id int64) error {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var active int
+	if err = tx.QueryRow("SELECT count(*) FROM ai_runs WHERE job_id=? AND status IN ('pending','running')", id).Scan(&active); err != nil {
+		return err
+	}
+	if active > 0 {
+		return errors.New("任务正在排队或执行，请先取消后删除")
+	}
+	res, err := tx.Exec("UPDATE ai_jobs SET deleted=1,enabled=0,next_run=0 WHERE id=? AND deleted=0", id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return tx.Commit()
+}
 func (m *Manager) Jobs() ([]Job, error) {
-	rows, err := m.DB.Query("SELECT id,config,enabled,next_run FROM ai_jobs ORDER BY id DESC")
+	rows, err := m.DB.Query("SELECT id,config,enabled,next_run FROM ai_jobs WHERE deleted=0 ORDER BY id DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +230,7 @@ func (m *Manager) Enqueue(id int64) (int64, error) {
 	}
 	defer tx.Rollback()
 	var data string
-	if err = tx.QueryRow("SELECT config FROM ai_jobs WHERE id=?", id).Scan(&data); err != nil {
+	if err = tx.QueryRow("SELECT config FROM ai_jobs WHERE id=? AND deleted=0", id).Scan(&data); err != nil {
 		return 0, err
 	}
 	runID, err := insertRun(tx, id, data, "manual", "")
@@ -293,7 +321,7 @@ func (m *Manager) scheduleJob(j Job, now time.Time) error {
 	var data string
 	var enabled bool
 	var next, cursor int64
-	if err = tx.QueryRow("SELECT config,enabled,next_run,event_cursor FROM ai_jobs WHERE id=?", j.ID).Scan(&data, &enabled, &next, &cursor); err != nil {
+	if err = tx.QueryRow("SELECT config,enabled,next_run,event_cursor FROM ai_jobs WHERE id=? AND deleted=0", j.ID).Scan(&data, &enabled, &next, &cursor); err != nil {
 		return err
 	}
 	if !enabled {

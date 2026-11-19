@@ -1,3 +1,4 @@
+import Select from './Select'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, KeyRound, RefreshCw, ShieldCheck, Terminal, Trash2 } from 'lucide-react'
@@ -111,7 +112,7 @@ export default function GitCredentials() {
     <div className="git-credential-body">
      <p className="muted">选择代码托管平台，Zhan 会用内置密钥执行一次只读 SSH 握手。</p>
      <div className="git-test-row">
-      <select value={host} onChange={e => setHost(e.target.value)} aria-label="Git 托管平台">{platforms.map(item => <option key={item.host} value={item.host}>{item.label}（{item.host}）</option>)}</select>
+      <Select value={host} onChange={e => setHost(e.target.value)} aria-label="Git 托管平台">{platforms.map(item => <option key={item.host} value={item.host}>{item.label}（{item.host}）</option>)}</Select>
       <button type="button" className="button primary" disabled={busy !== null} onClick={() => void runTest()}>{busy === 'test' ? '正在测试…' : '测试连接'}</button>
      </div>
      {test && <div className={`git-test-result ${test.ok ? 'success' : 'failed'}`}>

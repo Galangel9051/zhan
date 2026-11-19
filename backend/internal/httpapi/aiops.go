@@ -75,6 +75,19 @@ func (s *Server) aiRoutes(api *gin.RouterGroup) {
 	}
 	ai.POST("/jobs", save)
 	ai.PUT("/jobs/:id", save)
+	ai.DELETE("/jobs/:id", func(c *gin.Context) {
+		id, ok := idParam(c)
+		if !ok {
+			return
+		}
+		err := s.AI.DeleteJob(id)
+		s.DB.Audit(user(c).Username, "ai_job_delete", strconv.FormatInt(id, 10), result(err))
+		if err != nil {
+			fail(c, 409, err.Error())
+			return
+		}
+		c.Status(204)
+	})
 	ai.POST("/jobs/:id/run", func(c *gin.Context) {
 		id, ok := idParam(c)
 		if !ok {

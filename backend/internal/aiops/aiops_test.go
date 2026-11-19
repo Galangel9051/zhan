@@ -57,6 +57,37 @@ func provider(t *testing.T, m *Manager, handler http.HandlerFunc) *httptest.Serv
 	}
 	return server
 }
+func TestDeleteJobPreservesHistoryAndPreventsScheduling(t *testing.T) {
+	m, j := fixture(t)
+	provider(t, m, func(w http.ResponseWriter, r *http.Request) { assistant(w, "完成") })
+	id, err := m.Enqueue(j.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = m.DeleteJob(j.ID); err == nil {
+		t.Fatal("deleted active job")
+	}
+	m.work(context.Background())
+	if err = m.DeleteJob(j.ID); err != nil {
+		t.Fatal(err)
+	}
+	jobs, err := m.Jobs()
+	if err != nil || len(jobs) != 0 {
+		t.Fatalf("deleted job listed: %v", err)
+	}
+	if _, err = m.Run(id); err != nil {
+		t.Fatalf("history lost: %v", err)
+	}
+	if _, err = m.Enqueue(j.ID); err == nil {
+		t.Fatal("deleted job enqueued")
+	}
+	if err = m.SaveJob(&j); err == nil {
+		t.Fatal("deleted job revived")
+	}
+	if err = m.DeleteJob(j.ID); err == nil {
+		t.Fatal("deleted twice")
+	}
+}
 func assistant(w http.ResponseWriter, content string, calls ...map[string]any) {
 	reason := "stop"
 	if len(calls) > 0 {

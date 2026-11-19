@@ -1,3 +1,4 @@
+import Select from './Select'
 import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Download, Plus, Search } from 'lucide-react'
@@ -55,14 +56,14 @@ export default function AIProviderForm({ initial, close }: { initial: Provider; 
        <label>上下文窗口（tokens）<input type="number" required min={1024} max={4000000} value={model.context_window} onChange={e => edit(model.id, { context_window: Number(e.target.value) })} /></label>
        <label>最大输出（tokens）<input type="number" required min={1} max={Math.max(1, model.context_window - 1)} value={model.max_output_tokens} onChange={e => edit(model.id, { max_output_tokens: Number(e.target.value) })} /></label>
        <label>温度<input type="number" min={0} max={2} step="0.1" placeholder="上游默认" value={model.temperature ?? ''} onChange={e => edit(model.id, { temperature: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>
-       <label className="full">输出限制参数<select value={model.output_parameter} onChange={e => edit(model.id, { output_parameter: e.target.value })}><option value="max_completion_tokens">max_completion_tokens</option><option value="max_tokens">max_tokens（兼容旧上游）</option></select></label>
+       <label className="full">输出限制参数<Select aria-label="输出限制参数" value={model.output_parameter} onChange={e => edit(model.id, { output_parameter: e.target.value })}><option value="max_completion_tokens">max_completion_tokens</option><option value="max_tokens">max_tokens（兼容旧上游）</option></Select></label>
        <small className="full subtle">{available?.find(m => m.id === model.id)?.context_window ? `上游报告上下文：${available.find(m => m.id === model.id)?.context_window} tokens` : '上游上下文容量未知，请手动确认。'} 执行前按消息与工具的 UTF-8 字节数保守估算输入，并预留最大输出，预算不足时停止并提示。</small>
       </div>}
      </div>)}
      {filtered.length > limit && <button type="button" className="button compact" onClick={() => setLimit(n => n + 100)}>加载更多（还有 {filtered.length - limit} 个）</button>}
     </div>
     <div className="ai-model-manual full"><input aria-label="手动模型 ID" maxLength={200} value={manual} onChange={e => setManual(e.target.value)} placeholder="上游不支持列表时，手动填写模型 ID" /><button type="button" className="button" onClick={addManual} disabled={!manual.trim()}><Plus size={14} />添加模型</button></div>
-    <label className="full">默认模型<select value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} required={form.enabled}><option value="">请选择已启用的模型</option>{enabled.map(m => <option key={m.id} value={m.id}>{m.name || m.id} · {m.id}</option>)}</select><small>未单独选择模型的任务使用此模型。</small></label>
+    <label className="full">默认模型<Select aria-label="默认模型" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} required={form.enabled}><option value="">请选择已启用的模型</option>{enabled.map(m => <option key={m.id} value={m.id}>{m.name || m.id} · {m.id}</option>)}</Select><small>未单独选择模型的任务使用此模型。</small></label>
     <label className="checkbox-label full"><input type="checkbox" checked={form.enabled} onChange={e => setForm({ ...form, enabled: e.target.checked })} />启用 AI 接口与任务执行</label>
    </div>
    <div className="modal-footer"><button type="button" className="button" onClick={close}>取消</button><button className="button primary" disabled={busy || fetching || (form.enabled && !enabled.length)}>{busy ? '保存中…' : '保存接口与模型'}</button></div>
